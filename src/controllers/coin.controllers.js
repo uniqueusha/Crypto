@@ -1,5 +1,13 @@
 const pool = require("../../db");
 const axios = require('axios');
+const getConnection = async () => {
+    try {
+        const connection = await pool.getConnection();
+        return connection;
+    } catch (error) {
+        throw new Error("Failed to obtain database connection: " + error.message);
+    }
+};
 //error 422 handler
 error422 = (message, res) => {
     return res.status(422).json({
@@ -76,7 +84,8 @@ const addCoin = async (req, res)=>{
     connection.release()
 
    }
-}
+};
+
 //get coins list...
 const getCoins = async(req, res)=>{
     let connection;  
@@ -108,8 +117,39 @@ const getCoins = async(req, res)=>{
     } finally {
         if(connection) connection.release()
     }
-}
+};
+
+//get coin active
+const getCoinWma = async (req, res) => {
+
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+        // Start a transaction
+        let coinQuery = `SELECT * FROM coins
+        WHERE status = 1 ORDER BY coin_name `;
+        const coinResult = await connection.query(coinQuery);
+        const coin = coinResult[0];
+
+        res.status(200).json({
+            status: 200,
+            message: "Coin retrieved successfully.",
+            data: coin,
+        });
+    } catch (error) {
+        error500(error, res);
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
 module.exports = {
     addCoin,
-    getCoins
+    getCoins,
+    getCoinWma
 }
