@@ -33,6 +33,7 @@ const addSaleTargetHeader = async (req, res) => {
         const base_price = req.body.base_price ? req.body.base_price: '';
         // const currant_price = req.body.currant_price ? req.body.currant_price: '';
         const return_x = req.body.return_x ? req.body.return_x: '';
+        const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price: '';
         const available_coins = req.body.available_coins ? req.body.available_coins	: '';
         const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter: [];
         const untitled_id = req.companyData.untitled_id;
@@ -47,16 +48,10 @@ const addSaleTargetHeader = async (req, res) => {
         } 
         let connection = await getConnection();
         try {
-            const final_sale_price = base_price*return_x;
+            
             //Start the transaction
             await connection.beginTransaction();
-            //insert into Sale target header
-            // const currentPriceUrl = await axios.get(
-            //     `https://min-api.cryptocompare.com/data/price?fsym=${tricker}&tsyms=USD`
-            // );
-            // console.log('hi', currentPriceUrl.data);
-            // const price = currentPriceUrl.data.USD;
-            
+        
             if (!tricker) {
                 const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
                 const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);
@@ -76,14 +71,6 @@ const addSaleTargetHeader = async (req, res) => {
             const insertSaleTargetHeaderValue = [coin, base_price, price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
-
-            // if (!tricker) {
-            //     const insertTrickerQuery = `INSERT INTO api_setting ( tricker ) VALUES (?)`;
-            //     const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);
-            // } else {
-            //     const updateTrickerQuery = `UPDATE api_setting SET tricker WHERE id = 1`;
-            //     const updateTrickerResult = await connection.query(updateTrickerQuery);
-            // }
             
             //insert into set target footer
             let setTargetFooterArray = setTargetFooter.reverse()
@@ -98,10 +85,7 @@ const addSaleTargetHeader = async (req, res) => {
                 if (i == 0) {
                     sale_target = final_sale_price
                 }
-                 
-
                 
-
                 const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
                 const target_status_id = element.target_status_id ? element.target_status_id: '';
                 const complition_status_id = element.complition_status_id ? element.complition_status_id: '';
@@ -117,14 +101,14 @@ const addSaleTargetHeader = async (req, res) => {
             //commit the transation
             await connection.commit();
             res.status(200).json({
-                
                 status: 200,
                 message: "Sale Target Added successfully",
+                data:{
+                currentPrice: price
+                }
             });
         }catch (error) {
             console.log(error);
-            
-            
             return error500(error, res);
         } finally {
             await connection.release();
