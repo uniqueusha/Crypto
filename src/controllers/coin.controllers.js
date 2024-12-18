@@ -124,6 +124,41 @@ const getCoins = async(req, res)=>{
     }
 };
 
+// get coin by id...
+const getCoin = async (req, res) => {
+    const coin_id = parseInt(req.params.id);
+
+    const coinCheckQuery = "SELECT * FROM coins WHERE coin_id = ?";
+    const coinCheckResult = await pool.query(coinCheckQuery, [coin_id]);
+    if (coinCheckResult[0].length === 0) {
+        return error422("Coin Not Found.", res);
+    }
+
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        const coinQuery = `SELECT * FROM coins WHERE coin_id = ?`;
+        const coinResult = await connection.query(coinQuery, [coin_id]);
+
+        const coin = coinResult[0][0];
+        res.status(200).json({
+            status: 200,
+            message: "Coin Retrived Successfully",
+            data: coin,
+        });
+    } catch (error) {
+        error500(error, res);
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
 //get coin active
 const getCoinWma = async (req, res) => {
 
@@ -135,7 +170,7 @@ const getCoinWma = async (req, res) => {
         await connection.beginTransaction();
         // Start a transaction
         let coinQuery = `SELECT * FROM coins
-        WHERE status = 1 ORDER BY coin_name `;
+        WHERE status = 1 ORDER BY coin_name limit 200 `;
         const coinResult = await connection.query(coinQuery);
         const coin = coinResult[0];
 
@@ -156,5 +191,6 @@ const getCoinWma = async (req, res) => {
 module.exports = {
     addCoin,
     getCoins,
+    getCoin,
     getCoinWma
 }
