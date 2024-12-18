@@ -50,7 +50,7 @@ const addCoin = async (req, res)=>{
         if (!(isExistCoinResult[0].length > 0)) {
             if (element.ImageUrl) {
                 let coinQuery = "INSERT INTO coins (id, image_url, ticker_symbol, coin_name, short_name) VALUES (?, ?, ?, ?, ?)";
-                let coinValue = [element.Id, element.ImageUrl, element.Symbol, element.FullName, element.Id];
+                let coinValue = [element.Id, element.ImageUrl, element.Symbol, element.FullName, element.Symbol];
                 const coinResult = await connection.query(coinQuery, coinValue);
     
                 insertCount++;
@@ -68,14 +68,19 @@ const addCoin = async (req, res)=>{
     }
     
     // Log the counts
-    console.log(`Total empty images: ${emptyImageCount}`);
-    console.log(`Total duplicates: ${duplicateCount}`);
-    console.log(`Total inserted: ${insertCount}`);
+    // console.log(`Total empty images: ${emptyImageCount}`);
+    // console.log(`Total duplicates: ${duplicateCount}`);
+    // console.log(`Total inserted: ${insertCount}`);
     
     connection.commit();
     res.status(200).json({
         status:200,
-        message:"Coin added successfully!"
+        message:"Coin added successfully!",
+        data: {
+         "emptyImageCount" :  emptyImageCount,
+         "duplicateCount" : duplicateCount,
+         "insertCount" : insertCount
+        }
     })
    } catch (error) {
     connection.rollback();

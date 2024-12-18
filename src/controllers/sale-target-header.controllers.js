@@ -1,5 +1,5 @@
 const pool = require("../../db");
-
+const axios = require('axios');
 // Function to obtain a database connection
 const getConnection = async () => {
     try {
@@ -29,17 +29,17 @@ error500 = (error, res) => {
 
 const addSaleTargetHeader = async (req, res) => {
         const coin = req.body.coin ? req.body.coin: '';
+        const tricker = req.body.tricker ? req.body.tricker: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
-        const currant_price = req.body.currant_price ? req.body.currant_price: '';
+        // const currant_price = req.body.currant_price ? req.body.currant_price: '';
         const return_x = req.body.return_x ? req.body.return_x: '';
         const available_coins = req.body.available_coins ? req.body.available_coins	: '';
         const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter: [];
+        const untitled_id = req.companyData.untitled_id;
         if (!coin) {
             return error422("Coin is required.", res);
         }  else if (!base_price) {
             return error422("Base Price is required.", res);
-        }  else if (!currant_price) {
-            return error422("Currant Price is required.", res);
         }  else if (!return_x) {
             return error422("Return_x is required.", res);
         }  else if (!available_coins) {
@@ -51,10 +51,39 @@ const addSaleTargetHeader = async (req, res) => {
             //Start the transaction
             await connection.beginTransaction();
             //insert into Sale target header
-            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins) VALUES (?, ?, ?, ?, ?, ?)`;
-            const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins];
+            // const currentPriceUrl = await axios.get(
+            //     `https://min-api.cryptocompare.com/data/price?fsym=${tricker}&tsyms=USD`
+            // );
+            // console.log('hi', currentPriceUrl.data);
+            // const price = currentPriceUrl.data.USD;
+            
+            if (!tricker) {
+                const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
+                const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);
+                
+            } else {
+                const updateTrickerQuery = `UPDATE api_settings SET tricker = ? WHERE id = 1`;
+                const updateTrickerResult = await connection.query(updateTrickerQuery, [tricker]);
+            }
+            const query = 'SELECT url, tricker, currency_name FROM api_settings';
+            const result = await connection.query(query);
+            // Loop through the results and concatenate the fields
+            const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+            const currentPriceUrl = await axios.get(fullUrls);
+            const price = currentPriceUrl.data.USD;
+            
+            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            const insertSaleTargetHeaderValue = [coin, base_price, price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
+
+            // if (!tricker) {
+            //     const insertTrickerQuery = `INSERT INTO api_setting ( tricker ) VALUES (?)`;
+            //     const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);
+            // } else {
+            //     const updateTrickerQuery = `UPDATE api_setting SET tricker WHERE id = 1`;
+            //     const updateTrickerResult = await connection.query(updateTrickerQuery);
+            // }
             
             //insert into set target footer
             let setTargetFooterArray = setTargetFooter.reverse()
@@ -66,10 +95,13 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
-                if (i==0) {
+                if (i == 0) {
                     sale_target = final_sale_price
                 }
+                 
+
                 
+
                 const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
                 const target_status_id = element.target_status_id ? element.target_status_id: '';
                 const complition_status_id = element.complition_status_id ? element.complition_status_id: '';
@@ -77,22 +109,27 @@ const addSaleTargetHeader = async (req, res) => {
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
 
-                let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, target_status_id, complition_status_id, sale_target_percent) VALUES (?,?,?,?,?,?)';
-                let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, target_status_id, complition_status_id, sale_target_percent];
+                let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, target_status_id, complition_status_id, sale_target_percent, untitled_id) VALUES (?,?,?,?,?,?,?)';
+                let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, target_status_id, complition_status_id, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
+                
             }
             //commit the transation
             await connection.commit();
             res.status(200).json({
+                
                 status: 200,
                 message: "Sale Target Added successfully",
             });
         }catch (error) {
+            console.log(error);
+            
+            
             return error500(error, res);
         } finally {
             await connection.release();
         }
-    };
+};
 
 
 module.exports = {
