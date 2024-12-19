@@ -161,7 +161,7 @@ const getCoin = async (req, res) => {
 
 //get coin active
 const getCoinWma = async (req, res) => {
-
+    const { key } = req.query;
     // Attempt to obtain a database connection
     let connection = await getConnection();
 
@@ -170,7 +170,12 @@ const getCoinWma = async (req, res) => {
         await connection.beginTransaction();
         // Start a transaction
         let coinQuery = `SELECT * FROM coins
-        WHERE status = 1 ORDER BY coin_name limit 200 `;
+        WHERE status = 1`;
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            coinQuery += ` AND LOWER(coin_name) LIKE '%${lowercaseKey}%'`;  
+        }
+        coinQuery += ` limit 200`;
         const coinResult = await connection.query(coinQuery);
         const coin = coinResult[0];
 

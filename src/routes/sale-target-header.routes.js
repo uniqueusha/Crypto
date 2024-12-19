@@ -5,6 +5,6 @@ const checkAuth = require("../middleware/check.auth");
 
 //add sale target header
 router.post('/', checkAuth, saleTargetHeaderController.addSaleTargetHeader)
-// router.get('',coinController.getCoins)
+router.get('/', checkAuth, saleTargetHeaderController.getCronJob);
 
 module.exports = router
