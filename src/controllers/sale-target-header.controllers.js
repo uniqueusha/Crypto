@@ -29,9 +29,7 @@ error500 = (error, res) => {
 
 const addSaleTargetHeader = async (req, res) => {
         const coin = req.body.coin ? req.body.coin: '';
-        const tricker = req.body.tricker ? req.body.tricker: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
-        // const currant_price = req.body.currant_price ? req.body.currant_price: '';
         const return_x = req.body.return_x ? req.body.return_x: '';
         const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price: '';
         const available_coins = req.body.available_coins ? req.body.available_coins	: '';
@@ -52,23 +50,9 @@ const addSaleTargetHeader = async (req, res) => {
             //Start the transaction
             await connection.beginTransaction();
             // let final_sale_price = base_price * return_x;
-            if (!tricker) {
-                const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
-                const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);
-                
-            } else {
-                const updateTrickerQuery = `UPDATE api_settings SET tricker = ? WHERE id = 1`;
-                const updateTrickerResult = await connection.query(updateTrickerQuery, [tricker]);
-            }
-            const query = 'SELECT url, tricker, currency_name FROM api_settings';
-            const result = await connection.query(query);
-            // Loop through the results and concatenate the fields
-            const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
-            const currentPriceUrl = await axios.get(fullUrls);
-            const price = currentPriceUrl.data.USD;
-            
-            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-            const insertSaleTargetHeaderValue = [coin, base_price, price, return_x, final_sale_price, available_coins, untitled_id];
+
+            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?)`;
+            const insertSaleTargetHeaderValue = [coin, base_price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
             
@@ -103,16 +87,54 @@ const addSaleTargetHeader = async (req, res) => {
             res.status(200).json({
                 status: 200,
                 message: "Sale Target Added successfully",
-                data:{
-                currentPrice: price
-                }
             });
         }catch (error) {
-            console.log(error);
             return error500(error, res);
         } finally {
             await connection.release();
         }
+};
+
+//create current price
+const createCurrentPrice = async (req, res) => {
+    const tricker = req.body.tricker ? req.body.tricker: '';
+    if (!tricker) {
+        return error422("Tricker Symbol is required.", res);
+    }   
+    let connection = await getConnection();
+    try {
+        
+        //Start the transaction
+        await connection.beginTransaction();
+        // let final_sale_price = base_price * return_x;
+        if (!tricker) {
+            const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
+            const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);  
+        } else {
+            const updateTrickerQuery = `UPDATE api_settings SET tricker = ? WHERE id = 1`;
+            const updateTrickerResult = await connection.query(updateTrickerQuery, [tricker]);
+        }
+        const query = 'SELECT url, tricker, currency_name FROM api_settings';
+        const result = await connection.query(query);
+        // Loop through the results and concatenate the fields
+        const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+        const currentPriceUrl = await axios.get(fullUrls);
+        const price = currentPriceUrl.data.USD;
+        
+        //commit the transation
+        await connection.commit();
+        res.status(200).json({
+            status: 200,
+            message: "Sale Target Added successfully",
+            data:{
+            currentPrice: price
+            }
+        });
+    }catch (error) {
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
 };
 
 //cron job
@@ -130,19 +152,25 @@ const getCronJob = async (req, res) => {
         WHERE stf.untitled_id = ?`;
 
         const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
-        console.log(result);
         
-
+        const resultReverse =result[0].reverse();
+        
         // Check if result contains rows
-        if (result && result.length > 0) {
+        if (resultReverse && resultReverse.length > 0) {
             // Loop through the results to compare the values
-            for (let i = 0; i < result.length; i++) {
-                const row = result[i];
-                const currentPrice = parseFloat(row.current_price);
-                const saleTarget = parseFloat(row.sale_target);
-
+            
+            for (let i = 0; i < resultReverse.length; i++) {
+                const row = resultReverse;
+            
+                const currantPrice = row[0].currant_price;
+                console.log(currantPrice);
+                
+                const saleTarget = row[0].sale_target;
+                console.log(saleTarget);
+                
+                
                 // Check if currentPrice is less than saleTarget
-                if (currentPrice >= saleTarget) {
+                if (currantPrice <= saleTarget) {
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 1 WHERE untitled_id = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId])
                 }
@@ -166,5 +194,6 @@ const getCronJob = async (req, res) => {
 
 module.exports = {
     addSaleTargetHeader,
-    getCronJob
+    getCronJob,
+    createCurrentPrice
 }

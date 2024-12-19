@@ -159,7 +159,7 @@ const getCoin = async (req, res) => {
     }
 };
 
-//get coin active
+//get coin active list limit 200
 const getCoinWma = async (req, res) => {
     const { key } = req.query;
     // Attempt to obtain a database connection
@@ -176,6 +176,35 @@ const getCoinWma = async (req, res) => {
             coinQuery += ` AND LOWER(coin_name) LIKE '%${lowercaseKey}%'`;  
         }
         coinQuery += ` limit 200`;
+        const coinResult = await connection.query(coinQuery);
+        const coin = coinResult[0];
+
+        res.status(200).json({
+            status: 200,
+            message: "Coin retrieved successfully.",
+            data: coin,
+        });
+    } catch (error) {
+        error500(error, res);
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
+//get coin active price display
+const getCoinWmaCurrentPrice = async (req, res) => {
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+        // Start a transaction
+        let coinQuery = `SELECT * FROM coins
+        WHERE status = 1`;
+        
         const coinResult = await connection.query(coinQuery);
         const coin = coinResult[0];
 
