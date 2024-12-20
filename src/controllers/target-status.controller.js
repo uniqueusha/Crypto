@@ -154,8 +154,6 @@ const getTargetStatusById = async (req, res) => {
             data: targetStatus,
         });
     } catch (error) {
-        console.log(error);
-        
         error500(error, res);
     } finally {
         if (connection) connection.release();

@@ -184,9 +184,78 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
     }
 };
  
+//Get Set Target List
+const getSetTargets = async (req, res) => {
+    const { page, perPage, key } = req.query;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        //Start the transaction
+        await connection.beginTransaction();
+
+        let getSetTargetQuery = `SELECT * FROM sale_target_header`;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header `;
+
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSetTargetQuery += ` WHERE status = 1`;
+                countQuery += ` WHERE status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSetTargetQuery += ` WHERE status = 0`;
+                countQuery += ` WHERE status = 0`;
+            } else {
+                getSetTargetQuery += ` WHERE  LOWER(coin) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%' `;
+            }
+        }
+        getSetTargetQuery += " ORDER BY sale_date DESC";
+        // Apply pagination if both page and perPage are provided
+        let total = 0;
+        if (page && perPage) {
+            const totalResult = await connection.query(countQuery);
+            total = parseInt(totalResult[0][0].total);
+
+            const start = (page - 1) * perPage;
+            getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+        }
+        let result = await connection.query(getSetTargetQuery);
+        let setTarget = result[0];
+ 
+        //get set_header_footer
+        for (let i = 0; i < setTarget.length; i++) {
+            const element = setTarget[i];
+            
+            let setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+            setFooterResult = await connection.query(setFooterQuery);
+            setTarget[i]['footer']= setFooterResult[0];
+        }
+
+        const data = {
+            status: 200,
+            message: "Set Target retrieved successfully",
+            data: setTarget,
+        };
+        // Add pagination information if provided
+        if (page && perPage) {
+            data.pagination = {
+                per_page: perPage,
+                total: total,
+                current_page: page,
+                last_page: Math.ceil(total / perPage),
+            };
+        }
+        return res.status(200).json(data);
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
+};
 
 module.exports = {
     addSaleTargetHeader,
     currantPriceUpdateTargetComplitionStatus,
-    createCurrentPrice
+    createCurrentPrice,
+    getSetTargets
 }

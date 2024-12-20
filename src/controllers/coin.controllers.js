@@ -188,7 +188,49 @@ const getCoinWma = async (req, res) => {
     }
 };
 
-//get coin active price display
+//get coin active price display  -- cron job
+// const getCoinActiveCurrentPrice = async (req, res) => {
+//     // Attempt to obtain a database connection
+//     let connection = await getConnection();
+
+//     try {
+//         // Start a transaction
+//         await connection.beginTransaction();
+//         // Start a transaction
+//         let coinQuery = `SELECT * FROM coins WHERE status = 1`;
+//         const coinResult = await connection.query(coinQuery);
+//         const coin = coinResult[0];
+//         for (let i = 0; i < coinResult.length; i++) {
+//             const element = coinResult[i];
+//             const tricker = element[i].short_name; // Short name of the coin
+//             console.log(tricker);
+            
+//             if(tricker){
+
+//             const query = 'SELECT url, tricker, currency_name FROM api_settings WHERE tricker = ?';
+//             const result = await connection.query(query, [tricker]);
+//             if (result.length > 0) {
+//             const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+//             const currentPriceUrl = await axios.get(fullUrls);
+//             const price = currentPriceUrl.data.USD;
+            
+//             console.log(price);
+//             }
+//         }
+//         }
+//         res.status(200).json({
+//             status: 200,
+//             message: "Coin Active Current Price retrieved successfully.",
+//             data: coin,
+//         });
+//     } catch (error) {
+//         error500(error, res);
+//     } finally {
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// };
 const getCoinActiveCurrentPrice = async (req, res) => {
     // Attempt to obtain a database connection
     let connection = await getConnection();
@@ -196,33 +238,53 @@ const getCoinActiveCurrentPrice = async (req, res) => {
     try {
         // Start a transaction
         await connection.beginTransaction();
-        // Start a transaction
+
+        // Fetch active coins from the coins table
         let coinQuery = `SELECT * FROM coins WHERE status = 1`;
-        const coinResult = await connection.query(coinQuery);
-        console.log(coinResult);
-        
-        const tricker = coinResult.short_name
+        const [coinResult] = await connection.query(coinQuery); // coinResult contains rows from the query
 
+        // Loop through each active coin
+        for (let i = 0; i < coinResult.length; i++) {
+            const element = coinResult[i];
+            const tricker = element.short_name; // Short name of the coin
+            
 
-        // const query = 'SELECT url, tricker, currency_name FROM api_settings';
-        //         const result = await connection.query(query);
-        //         // Loop through the results and concatenate the fields
-        //         const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
-        //         const currentPriceUrl = await axios.get(fullUrls);
-        //         const price = currentPriceUrl.data.USD;
-        
-        const coin = coinResult[0];
+            if (tricker) {
+                // Fetch URL, tricker, and currency_name from api_settings table
+                const query = 'SELECT url, tricker, currency_name FROM api_settings WHERE tricker = ?';
+                const [apiSettings] = await connection.query(query, [tricker]);
+                
+                
+                if (apiSettings.length > 0) {
+                    for (let i = 0; i < tricker.length; i++ ){
+                    const fullUrl = `${apiSettings[0].url}${apiSettings[0].tricker}${apiSettings[0].currency_name}`;
+                   
 
+                    // Make the API call to fetch the current price
+                    const currentPriceUrl = await axios.get(fullUrl);
+                    const price = currentPriceUrl.data.USD; // Assuming the API returns a price field in USD
+                    
+                    
+
+                }
+            }
+            }
+        }
+
+        // Commit the transaction after processing
+        await connection.commit();
+
+        // Send success response
         res.status(200).json({
             status: 200,
             message: "Coin Active Current Price retrieved successfully.",
-            data: coin,
+            data: coinResult, // Return the coins data as part of the response
         });
     } catch (error) {
-        error500(error, res);
+        error500(error, res); // Handle the error
     } finally {
         if (connection) {
-            connection.release();
+            connection.release(); // Release the connection
         }
     }
 };
