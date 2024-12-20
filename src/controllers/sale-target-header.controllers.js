@@ -30,6 +30,7 @@ error500 = (error, res) => {
 const addSaleTargetHeader = async (req, res) => {
         const coin = req.body.coin ? req.body.coin: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
+        const currant_price = req.body.currant_price ? req.body.currant_price: '';
         const return_x = req.body.return_x ? req.body.return_x: '';
         const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price: '';
         const available_coins = req.body.available_coins ? req.body.available_coins	: '';
@@ -51,8 +52,8 @@ const addSaleTargetHeader = async (req, res) => {
             await connection.beginTransaction();
             // let final_sale_price = base_price * return_x;
 
-            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?)`;
-            const insertSaleTargetHeaderValue = [coin, base_price, return_x, final_sale_price, available_coins, untitled_id];
+            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
             
