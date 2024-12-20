@@ -231,43 +231,132 @@ const getCoinWma = async (req, res) => {
 //         }
 //     }
 // };
+// const getCoinActiveCurrentPrice = async (req, res) => {
+//     // Attempt to obtain a database connection
+//     let connection = await getConnection();
+
+//     try {
+//         // Start a transaction
+//         await connection.beginTransaction();
+
+//         // Fetch active coins from the coins table
+//         let coinQuery = `SELECT * FROM coins WHERE status = 1`;
+//         const [coinResult] = await connection.query(coinQuery); // coinResult contains rows from the query
+
+//         // Loop through each active coin
+//         for (let i = 0; i < coinResult.length; i++) {
+//             const element = coinResult[i];
+//             const tricker = element.short_name; // Short name of the coin
+            
+// console.log('name',tricker);
+
+//             if (tricker) {
+//                 // Fetch URL, tricker, and currency_name from api_settings table
+//                 const query = 'SELECT url, tricker, currency_name FROM api_settings WHERE tricker = ?';
+//                 const [apiSettings] = await connection.query(query, [tricker]);
+                
+                
+//                 if (apiSettings.length > 0) {
+                   
+//                     const fullUrl = `${apiSettings[0].url}${apiSettings[0].tricker}${apiSettings[0].currency_name}`;
+                   
+
+//                     // // Make the API call to fetch the current price
+//                     // for (let i = 0; i < tricker.length; i++ ){
+//                     const currentPriceUrl = await axios.get(fullUrl);
+//                     const price = currentPriceUrl.data.USD; // Assuming the API returns a price field in USD
+                    
+// console.log('hiii',price);
+
+
+//                 // }
+//             }
+//             }
+//         }
+
+//         // Commit the transaction after processing
+//         await connection.commit();
+
+//         // Send success response
+//         res.status(200).json({
+//             status: 200,
+//             message: "Coin Active Current Price retrieved successfully.",
+//             data: coinResult, // Return the coins data as part of the response
+//         });
+//     } catch (error) {
+//         error500(error, res); // Handle the error
+//     } finally {
+//         if (connection) {
+//             connection.release(); // Release the connection
+//         }
+//     }
+// };
+
+
 const getCoinActiveCurrentPrice = async (req, res) => {
-    // Attempt to obtain a database connection
-    let connection = await getConnection();
+    let connection = await getConnection(); // Obtain a database connection
 
     try {
         // Start a transaction
         await connection.beginTransaction();
 
         // Fetch active coins from the coins table
-        let coinQuery = `SELECT * FROM coins WHERE status = 1`;
+        const coinQuery = `SELECT * FROM coins WHERE status = 1`;
         const [coinResult] = await connection.query(coinQuery); // coinResult contains rows from the query
+
+        // Array to store the coin prices
+        const coinPrices = [];
 
         // Loop through each active coin
         for (let i = 0; i < coinResult.length; i++) {
             const element = coinResult[i];
             const tricker = element.short_name; // Short name of the coin
-            
+
+            console.log('Coin Name:', tricker);
 
             if (tricker) {
-                // Fetch URL, tricker, and currency_name from api_settings table
+                // Fetch URL, tricker, and currency_name from the api_settings table
                 const query = 'SELECT url, tricker, currency_name FROM api_settings WHERE tricker = ?';
                 const [apiSettings] = await connection.query(query, [tricker]);
-                
-                
+
                 if (apiSettings.length > 0) {
-                    for (let i = 0; i < tricker.length; i++ ){
-                    const fullUrl = `${apiSettings[0].url}${apiSettings[0].tricker}${apiSettings[0].currency_name}`;
-                   
+                    // Loop through each API setting (handle multiple settings per tricker if needed)
+                    for (let j = 0; j < apiSettings.length; j++) {
+                        const apiSetting = apiSettings[j];
 
-                    // Make the API call to fetch the current price
-                    const currentPriceUrl = await axios.get(fullUrl);
-                    const price = currentPriceUrl.data.USD; // Assuming the API returns a price field in USD
-                    
-                    
+                        // Construct the URL dynamically for each tricker
+                        const fullUrl = `${apiSetting.url}${apiSetting.tricker}${apiSetting.currency_name}`;
+                        console.log('Request URL:', fullUrl);
 
+                        try {
+                            // Make the API call to fetch the current price
+                            const response = await axios.get(fullUrl);
+                            const price = response.data.USD; // Assuming the API returns a price in USD
+
+                            console.log(`Price for ${tricker}:`, price);
+
+                            // Add the coin price to the result array
+                            coinPrices.push({
+                                tricker,
+                                price,
+                            });
+                        } catch (apiError) {
+                            console.error(`Error fetching price for ${tricker}:`, apiError.message);
+                            coinPrices.push({
+                                tricker,
+                                price: null,
+                                error: apiError.message,
+                            });
+                        }
+                    }
+                } else {
+                    console.warn(`No API settings found for tricker: ${tricker}`);
+                    coinPrices.push({
+                        tricker,
+                        price: null,
+                        error: 'No API settings found',
+                    });
                 }
-            }
             }
         }
 
@@ -278,9 +367,10 @@ const getCoinActiveCurrentPrice = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Coin Active Current Price retrieved successfully.",
-            data: coinResult, // Return the coins data as part of the response
+            data: coinPrices, // Return the coin prices as part of the response
         });
     } catch (error) {
+        console.error('Error:', error.message);
         error500(error, res); // Handle the error
     } finally {
         if (connection) {
@@ -288,6 +378,7 @@ const getCoinActiveCurrentPrice = async (req, res) => {
         }
     }
 };
+
 
 module.exports = {
     addCoin,
