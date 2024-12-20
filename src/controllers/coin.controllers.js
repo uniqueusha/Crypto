@@ -113,7 +113,7 @@ const getCoins = async(req, res)=>{
         connection.commit()
         return res.status(200).json({
             status:200,
-            message:"Coin retrived successfully!",
+            message:"Coins retrived successfully!",
             data:coinResult[0]
         })
     } catch (error) {
@@ -127,23 +127,18 @@ const getCoins = async(req, res)=>{
 // get coin by id...
 const getCoin = async (req, res) => {
     const coin_id = parseInt(req.params.id);
-
-    const coinCheckQuery = "SELECT * FROM coins WHERE coin_id = ?";
-    const coinCheckResult = await pool.query(coinCheckQuery, [coin_id]);
-    if (coinCheckResult[0].length === 0) {
-        return error422("Coin Not Found.", res);
-    }
-
     // Attempt to obtain a database connection
     let connection = await getConnection();
 
     try {
         // Start a transaction
         await connection.beginTransaction();
-
+    
         const coinQuery = `SELECT * FROM coins WHERE coin_id = ?`;
         const coinResult = await connection.query(coinQuery, [coin_id]);
-
+        if (coinResult[0].length === 0) {
+            return error422("Coin Not Found.", res);
+        }
         const coin = coinResult[0][0];
         res.status(200).json({
             status: 200,
@@ -202,15 +197,25 @@ const getCoinActiveCurrentPrice = async (req, res) => {
         // Start a transaction
         await connection.beginTransaction();
         // Start a transaction
-        let coinQuery = `SELECT * FROM coins
-        WHERE status = 1`;
-        
+        let coinQuery = `SELECT * FROM coins WHERE status = 1`;
         const coinResult = await connection.query(coinQuery);
+        console.log(coinResult);
+        
+        const tricker = coinResult.short_name
+
+
+        // const query = 'SELECT url, tricker, currency_name FROM api_settings';
+        //         const result = await connection.query(query);
+        //         // Loop through the results and concatenate the fields
+        //         const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+        //         const currentPriceUrl = await axios.get(fullUrls);
+        //         const price = currentPriceUrl.data.USD;
+        
         const coin = coinResult[0];
 
         res.status(200).json({
             status: 200,
-            message: "Coin retrieved successfully.",
+            message: "Coin Active Current Price retrieved successfully.",
             data: coin,
         });
     } catch (error) {
@@ -226,5 +231,6 @@ module.exports = {
     addCoin,
     getCoins,
     getCoin,
-    getCoinWma
+    getCoinWma,
+    getCoinActiveCurrentPrice
 }
