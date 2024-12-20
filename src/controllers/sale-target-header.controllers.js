@@ -47,6 +47,13 @@ const addSaleTargetHeader = async (req, res) => {
         } 
         let connection = await getConnection();
         try {
+
+            //check Coin already is exists or not
+            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ?`;
+            const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase()]);
+            if (isExistCoinResult[0].length > 0) {
+                return error422(" Coin is already exists.", res);
+            }
             
             //Start the transaction
             await connection.beginTransaction();
@@ -229,7 +236,7 @@ const getSetTargets = async (req, res) => {
             
             let setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
             setFooterResult = await connection.query(setFooterQuery);
-            setTarget[i]['footer']= setFooterResult[0];
+            setTarget[i]['footer']= setFooterResult[0].reverse();
         }
 
         const data = {
