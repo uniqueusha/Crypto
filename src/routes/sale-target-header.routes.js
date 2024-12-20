@@ -5,7 +5,7 @@ const checkAuth = require("../middleware/check.auth");
 
 //add sale target header
 router.post('/', checkAuth, saleTargetHeaderController.addSaleTargetHeader)
-router.get('/', checkAuth, saleTargetHeaderController.getCronJob);
 router.post('/currant-price', saleTargetHeaderController.createCurrentPrice);
+router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
 
 module.exports = router

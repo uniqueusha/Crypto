@@ -137,8 +137,8 @@ const createCurrentPrice = async (req, res) => {
     }
 };
 
-//cron job
-const getCronJob = async (req, res) => {
+//Currant Price Update Target Complition Status (cron job)
+const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     let connection = await getConnection();
     try {
@@ -153,26 +153,21 @@ const getCronJob = async (req, res) => {
 
         const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
         
-        const resultReverse =result[0].reverse();
+        const resultReverse = result[0].reverse();
         
         // Check if result contains rows
         if (resultReverse && resultReverse.length > 0) {
             // Loop through the results to compare the values
             
             for (let i = 0; i < resultReverse.length; i++) {
-                const row = resultReverse;
+                const row = resultReverse[i];
+                const currantPrice = parseFloat(row.currant_price);
+                const saleTarget = parseFloat(row.sale_target);
             
-                const currantPrice = row[0].currant_price;
-                console.log(currantPrice);
-                
-                const saleTarget = row[0].sale_target;
-                console.log(saleTarget);
-                
-                
                 // Check if currentPrice is less than saleTarget
-                if (currantPrice <= saleTarget) {
-                    const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 1 WHERE untitled_id = ?';
-                    const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId])
+                if (currantPrice > saleTarget) {
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 1 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
                 }
             }
         } 
@@ -181,19 +176,17 @@ const getCronJob = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Target Status Update successfully",
-            
         });
     }catch (error) {
-        console.log(error);
         return error500(error, res);
     } finally {
         await connection.release();
     }
 };
-
+ 
 
 module.exports = {
     addSaleTargetHeader,
-    getCronJob,
+    currantPriceUpdateTargetComplitionStatus,
     createCurrentPrice
 }

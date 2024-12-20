@@ -194,7 +194,7 @@ const getCoinWma = async (req, res) => {
 };
 
 //get coin active price display
-const getCoinWmaCurrentPrice = async (req, res) => {
+const getCoinActiveCurrentPrice = async (req, res) => {
     // Attempt to obtain a database connection
     let connection = await getConnection();
 
