@@ -1,5 +1,7 @@
 const pool = require("../../db");
 const axios = require('axios');
+const xlsx = require('xlsx');
+const fs = require('fs');
 // Function to obtain a database connection
 const getConnection = async () => {
     try {
@@ -261,9 +263,100 @@ const getSetTargets = async (req, res) => {
     }
 };
 
+//
+const getSetTargetDownload = async (req, res) => {
+    const { key } = req.query;
+    
+    // attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+
+        //start a transaction
+        await connection.beginTransaction();
+
+        let getSetTargetQuery = `SELECT * FROM sale_target_header`;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header `;
+
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSetTargetQuery += ` WHERE status = 1`;
+                countQuery += ` WHERE status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSetTargetQuery += ` WHERE status = 0`;
+                countQuery += ` WHERE status = 0`;
+            } else {
+                getSetTargetQuery += ` WHERE  LOWER(coin) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%' `;
+            }
+        }
+        getSetTargetQuery += " ORDER BY sale_date DESC";
+        // Apply pagination if both page and perPage are provided
+        
+        let result = await connection.query(getSetTargetQuery);
+        let setTarget = result[0];
+ 
+        //get set_header_footer
+        for (let i = 0; i < setTarget.length; i++) {
+            const element = setTarget[i];
+            
+            let setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+            setFooterResult = await connection.query(setFooterQuery);
+            setTarget[i]['footer']= setFooterResult[0].reverse();
+        }
+
+        // Commit the transaction
+        
+        const data = {
+            status: 200,
+            message: "Set Target retrieved successfully",
+            data: setTarget,
+        };
+        
+        if (data.length === 0) {
+            return res.status(404).send('No data found in the "adha" table.');
+        }
+
+        // Create a new workbook
+        const workbook = xlsx.utils.book_new();
+
+        // Create a worksheet and add data to it
+        const worksheet = xlsx.utils.json_to_sheet(setTarget);
+
+
+        // Add the worksheet to the workbook
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'setTargetInfo');
+
+        // Create a unique file name (e.g., based on timestamp)
+        const excelFileName = `exported_data_${Date.now()}.xlsx`;
+
+        // Write the workbook to a file
+        xlsx.writeFile(workbook, excelFileName);
+
+        // Send the file to the client for download
+        res.download(excelFileName, (err) => {
+            if (err) {
+                // Handle any errors that occur during download
+                console.error(err);
+                res.status(500).send('Error downloading the file.');
+            } else {
+                // Delete the file after it's been sent
+                fs.unlinkSync(excelFileName);
+            }
+        });
+         // Commit the transaction
+         await connection.commit();
+    } catch (error) {
+        return error500(error, res);
+    }finally {
+        if (connection) connection.release()
+    }
+};
+
 module.exports = {
     addSaleTargetHeader,
     currantPriceUpdateTargetComplitionStatus,
     createCurrentPrice,
-    getSetTargets
+    getSetTargets,
+    getSetTargetDownload
 }
