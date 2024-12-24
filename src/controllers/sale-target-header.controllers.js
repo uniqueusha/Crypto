@@ -176,7 +176,7 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             
                 // Check if currentPrice is less than saleTarget
                 if (currantPrice > saleTarget) {
-                    const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 1 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 2, complition_status_id = 2 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
                 }
             }
