@@ -59,7 +59,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            // let final_sale_price = base_price * return_x;
+            let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -81,14 +81,14 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
-                const target_status_id = element.target_status_id ? element.target_status_id: '';
-                const complition_status_id = element.complition_status_id ? element.complition_status_id: '';
+                // const target_id = element.target_id ? element.target_id: '';
+                // const complition_id = element.complition_id ? element.complition_id: '';
                 const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
 
-                let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, target_status_id, complition_status_id, sale_target_percent, untitled_id) VALUES (?,?,?,?,?,?,?)';
-                let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, target_status_id, complition_status_id, sale_target_percent, untitled_id];
+                let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)';
+                let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
                 
             }
@@ -176,7 +176,7 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             
                 // Check if currentPrice is less than saleTarget
                 if (currantPrice > saleTarget) {
-                    const updateStatusQuery = 'UPDATE set_target_footer SET target_status_id = 2, complition_status_id = 2 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 2 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
                 }
             }
@@ -203,7 +203,7 @@ const getSetTargets = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT * FROM sale_target_header`;
+        let getSetTargetQuery = `SELECT * FROM sale_target_header `;
         let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header `;
 
         if (key) {
@@ -236,7 +236,12 @@ const getSetTargets = async (req, res) => {
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
             
-            let setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+            let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+            LEFT JOIN target_status ts
+            ON ts.target_id = stf.target_id
+            LEFT JOIN complition_status cs
+            ON cs.complition_id = stf.complition_id 
+            WHERE stf.sale_target_id = ${element.sale_target_id}`;
             setFooterResult = await connection.query(setFooterQuery);
             setTarget[i]['footer']= setFooterResult[0].reverse();
         }
