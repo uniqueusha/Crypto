@@ -51,8 +51,8 @@ const addSaleTargetHeader = async (req, res) => {
         try {
 
             //check Coin already is exists or not
-            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ?`;
-            const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase()]);
+            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
+            const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
             if (isExistCoinResult[0].length > 0) {
                 return error422(" Coin is already exists.", res);
             }
@@ -90,6 +90,8 @@ const addSaleTargetHeader = async (req, res) => {
                 let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)';
                 let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
+
+
                 
             }
             //commit the transation
@@ -147,6 +149,48 @@ const createCurrentPrice = async (req, res) => {
     }
 };
 
+//update current price
+// const CurrentPrice = async (req, res) => {
+//     const tricker = req.body.tricker ? req.body.tricker: '';
+//     if (!tricker) {
+//         return error422("Tricker Symbol is required.", res);
+//     }   
+//     let connection = await getConnection();
+//     try {
+        
+//         //Start the transaction
+//         await connection.beginTransaction();
+//         // let final_sale_price = base_price * return_x;
+//         if (!tricker) {
+//             const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
+//             const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);  
+//         } else {
+//             const updateTrickerQuery = `UPDATE api_settings SET tricker = ? WHERE id = 1`;
+//             const updateTrickerResult = await connection.query(updateTrickerQuery, [tricker]);
+//         }
+//         const query = 'SELECT url, tricker, currency_name FROM api_settings';
+//         const result = await connection.query(query);
+//         // Loop through the results and concatenate the fields
+//         const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+//         const currentPriceUrl = await axios.get(fullUrls);
+//         const price = currentPriceUrl.data.USD;
+        
+//         //commit the transation
+//         await connection.commit();
+//         res.status(200).json({
+//             status: 200,
+//             message: "Fetch Current Price successfully",
+//             data:{
+//             currentPrice: price
+//             }
+//         });
+//     }catch (error) {
+//         return error500(error, res);
+//     } finally {
+//         await connection.release();
+//     }
+// // };
+
 //Currant Price Update Target Complition Status (cron job)
 const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
@@ -177,9 +221,50 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
                 // Check if currentPrice is less than saleTarget
                 if (currantPrice > saleTarget) {
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 2 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget]);
+                 
+                    const fetchSetTagetQuery = ` SELECT sth.*, stf.* FROM sale_target_header sth
+                    LEFT JOIN set_target_footer stf
+                    ON sth.sale_target_id = stf.sale_target_id WHERE sth.untitled_id = ?`;
+                    const fetchSetTargetResult = await connection.query(fetchSetTagetQuery, [untitledId]);
+                    const result = fetchSetTargetResult;
+                    const coin = result.coin; 
+                    const sale_footer_id = result.sale_footer_id;
+                    const sale_target_percent = result.sale_target_percent;
+        //             let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ? `;
+        // let result = await connection.query(getSetTargetQuery, [untitledId]);
+        // let setTarget = result[0];
+        
+        
+        // //get set_header_footer
+        // for (let i = 0; i < setTarget.length; i++) {
+        //     const element = setTarget[i];
+            
+        //     let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+        //     LEFT JOIN target_status ts
+        //     ON ts.target_id = stf.target_id
+        //     LEFT JOIN complition_status cs
+        //     ON cs.complition_id = stf.complition_id 
+        //     WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ?`;
+        //     setFooterResult = await connection.query(setFooterQuery, [untitledId]);
+        //     setTarget[i]['footer']= setFooterResult[0].reverse();
+        //     const data = setTarget;
+        //     console.log(data);
+        // }
+        
+        
+        
+        
+                    
+                    // if ( fetchSetTargetResult.complition_id == 2) { 
+                    // const insertSoidCoinQuery = `INSERT INTO spol_coin (coin, sale_footer_id, sale_target_percent, sold_current_price) VALUES (?, ?, ?, ?, ?)`;
+                    // const insertSoidCoinResult = await connection.query(insertSoidCoinQuery, [coin, sale_footer_id, sale_target_percent, sold_current_pricec])
+                } else {
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 1, complition_id = 1 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
                 }
-            }
+            // }
+        }
         } 
         //commit the transation
         await connection.commit();
@@ -188,6 +273,8 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             message: "Target Status Update successfully",
         });
     }catch (error) {
+        console.log(error);
+        
         return error500(error, res);
     } finally {
         await connection.release();
@@ -357,6 +444,7 @@ const getSetTargetDownload = async (req, res) => {
         if (connection) connection.release()
     }
 };
+
 
 module.exports = {
     addSaleTargetHeader,
