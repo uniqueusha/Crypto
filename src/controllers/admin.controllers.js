@@ -1,6 +1,17 @@
 const pool = require("../../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+
+let transporter = nodemailer.createTransport({
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: "poorva@webmantraitsolutions.com", // generated ethereal user
+    pass: "Webmantra@123", // generated ethereal password
+  },
+});
 
 // Function to obtain a database connection
 const getConnection = async () => {
@@ -41,23 +52,14 @@ const addUser = async (req, res) => {
         return error422("Email Id required.", res);
     }
 
-    //check User Name already is exists or not
-    // const isExistUserNameQuery = `SELECT * FROM users WHERE LOWER(TRIM(user_name))= ?`;
-    // const isExistUserNameResult = await pool.query(isExistUserNameQuery, [
-    //     user_name.toLowerCase(),
+    // //check Email Id already is exists or not
+    // const isExistEmailIdQuery = `SELECT * FROM untitled WHERE email_id= ?`;
+    // const isExistEmailIdResult = await pool.query(isExistEmailIdQuery, [
+    //     email_id,
     // ]);
-    // if (isExistUserNameResult[0].length > 0) {
-    //     return error422(" User Name is already exists.", res);
+    // if (isExistEmailIdResult[0].length > 0) {
+    //     return error422("Email Id is already exists.", res);
     // }
-
-    //check Email Id already is exists or not
-    const isExistEmailIdQuery = `SELECT * FROM untitled WHERE email_id= ?`;
-    const isExistEmailIdResult = await pool.query(isExistEmailIdQuery, [
-        email_id,
-    ]);
-    if (isExistEmailIdResult[0].length > 0) {
-        return error422("Email Id is already exists.", res);
-    }
 
     // Check if user type exists
     const userTypeQuery ="SELECT * FROM user_type WHERE user_type_id = ?";
@@ -99,6 +101,66 @@ const addUser = async (req, res) => {
             insertContrasenaQuery,
             insertContrasenaValues
         )
+
+        const message = `
+
+         <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Welcome to Crypto.com</title>
+        <style>
+            div{
+            font-family: Arial, sans-serif; 
+             margin: 0px;
+              padding: 0px;
+              color:black;
+            }
+        </style>
+      </head>
+      <body>
+      <div>
+          <h2 style="text-transform: capitalize;" >Hello ${user_name},</h2>
+<p>Welcome to <strong>Crypto</strong> – the platform where your passion for digital assets turns into limitless opportunities!</p>
+
+          <p>Here are your account details:</p>
+          
+            <strong style="text-transform: capitalize;">Username:</strong> ${user_name}<br>
+            <strong>Email:</strong> ${email_id}<br>
+            <strong>Password:</strong> ${password}<br>
+         
+          <p>Get ready to dive into the exciting world of cryptocurrency trading and investment!</p>
+<p>Buy, Sell, and Hold your favorite digital assets. Your journey to financial freedom starts now with <strong>Crypto</strong>.</p>
+          <p>Best of luck, <br> The Crypto Team</p>
+
+         
+        </div>
+      </body>
+      </html>
+`;
+
+    // Validate required fields.
+    if (!user_name || !email_id || !message) {
+      return res.status(400).json({
+        status: 400,
+        message: "Missing required fields",
+      });
+    }
+
+    // Prepare the email message options.
+    const mailOptions = {
+      from: "poorva@webmantraitsolutions.com", // Sender address from environment variables.
+      to: `${email_id}`, // Recipient's name and email address.
+      replyTo: "ushamyadav777@gmail.com", // Sets the email address for recipient responses.
+      cc: "ushamyadav777@gmail.com",
+      subject: "Welcome to Crypto!", // Subject line.
+      html: message, 
+    };
+
+    // Send email and log the response.
+    const info = await transporter.sendMail(mailOptions);
+    
+
        
         //commit the transation
         await connection.commit();
@@ -144,7 +206,7 @@ const userLogin = async (req, res) => {
 
         const isPasswordValid = await bcrypt.compare(password,user_contrasena.extenstions);
         if (!isPasswordValid) {
-            return error422("Password worng.", res);
+            return error422("Password wrong.", res);
         }
         // Generate a JWT token
         const token = jwt.sign(
