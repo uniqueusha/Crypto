@@ -37,8 +37,6 @@ const addUser = async (req, res) => {
     const password = req.body.password ? req.body.password : "";
     if (!user_name) {
         return error422("User Name is required.", res);
-    } else if (!password) {
-        return error422("Password is required.", res);
     } else if (!email_id) {
         return error422("Email Id required.", res);
     }
@@ -83,6 +81,13 @@ const addUser = async (req, res) => {
             insertUserValues
         );
         const untitled_id = insertuserResult[0].insertId;
+        let length = 8,
+        charset =
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        password = ''
+        for (let i = 0, n = charset.length; i < length; ++i) {
+            password += charset.charAt(Math.floor(Math.random() * n))
+        }
 
         const hash = await bcrypt.hash(password, 10); // Hash the password using bcrypt
 
@@ -184,20 +189,24 @@ const getUsers = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getUserQuery = `SELECT * FROM untitled`;
-        let countQuery = `SELECT COUNT(*) AS total FROM untitled`;
+        let getUserQuery = `SELECT u.*,ut.user_type FROM untitled u
+        LEFT JOIN user_type ut
+        ON u.user_type_id = ut.user_type_id`;
+        let countQuery = `SELECT COUNT(*) AS total FROM untitled u
+        LEFT JOIN user_type ut
+        ON u.user_type_id = ut.user_type_id`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
-                getUserQuery += ` WHERE status = 1`;
-                countQuery += ` WHERE status = 1`;
+                getUserQuery += ` WHERE u.status = 1`;
+                countQuery += ` WHERE u.status = 1`;
             } else if (lowercaseKey === "deactivated") {
-                getUserQuery += ` WHERE status = 0`;
-                countQuery += ` WHERE status = 0`;
+                getUserQuery += ` WHERE u.status = 0`;
+                countQuery += ` WHERE u.status = 0`;
             } else {
-                getUserQuery += ` WHERE  LOWER(user_name) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` WHERE LOWER(user_name) LIKE '%${lowercaseKey}%' `;
+                getUserQuery += ` WHERE  LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` WHERE LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
             }
         }
         getUserQuery += " ORDER BY cts DESC";
@@ -253,7 +262,9 @@ const getUser = async (req, res) => {
         // Start a transaction
         await connection.beginTransaction();
 
-        const userQuery = `SELECT * FROM untitled WHERE untitled_id = ?`;
+        const userQuery = `SELECT u.*,ut.user_type FROM untitled u
+        LEFT JOIN user_type ut
+        ON u.user_type_id = ut.user_type_id WHERE untitled_id = ?`;
         const userResult = await connection.query(userQuery, [untitled_id]);
 
         const user = userResult[0][0];
