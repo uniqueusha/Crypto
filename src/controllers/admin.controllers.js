@@ -52,14 +52,14 @@ const addUser = async (req, res) => {
         return error422("Email Id required.", res);
     }
 
-    // //check Email Id already is exists or not
-    // const isExistEmailIdQuery = `SELECT * FROM untitled WHERE email_id= ?`;
-    // const isExistEmailIdResult = await pool.query(isExistEmailIdQuery, [
-    //     email_id,
-    // ]);
-    // if (isExistEmailIdResult[0].length > 0) {
-    //     return error422("Email Id is already exists.", res);
-    // }
+    //check Email Id already is exists or not
+    const isExistEmailIdQuery = `SELECT * FROM untitled WHERE email_id= ?`;
+    const isExistEmailIdResult = await pool.query(isExistEmailIdQuery, [
+        email_id,
+    ]);
+    if (isExistEmailIdResult[0].length > 0) {
+        return error422("Email Id is already exists.", res);
+    }
 
     // Check if user type exists
     const userTypeQuery ="SELECT * FROM user_type WHERE user_type_id = ?";
