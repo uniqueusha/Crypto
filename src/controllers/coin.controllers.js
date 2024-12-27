@@ -166,12 +166,12 @@ const getCoinWma = async (req, res) => {
         await connection.beginTransaction();
 
         //check Coin already is exists or not
-        const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
-        const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
-        if (isExistCoinResult[0].length > 0) {
-            return error422(" Coin is already exists.", res);
-        }
-        
+        // const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
+        // const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
+        // if (isExistCoinResult[0].length > 0) {
+        //     return error422(" Coin is already exists.", res);
+        // }
+
         // Start a transaction
         let coinQuery = `SELECT * FROM coins
         WHERE status = 1`;
