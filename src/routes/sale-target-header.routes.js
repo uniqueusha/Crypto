@@ -9,5 +9,6 @@ router.post('/currant-price', saleTargetHeaderController.createCurrentPrice);
 router.get('/', saleTargetHeaderController.getSetTargets);
 router.get('/download-set-target', saleTargetHeaderController.getSetTargetDownload);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
+router.patch('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
 
 module.exports = router
