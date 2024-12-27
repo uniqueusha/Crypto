@@ -97,6 +97,7 @@ const getCoins = async(req, res)=>{
     // return res.json("Hii")
     try {
         connection = await pool.getConnection();
+
         let coinQuery = "SELECT * FROM coins";
         let coinResult = await connection.query(coinQuery)
         for (let index = 0; index < coinResult[0].length; index++) {
@@ -163,6 +164,14 @@ const getCoinWma = async (req, res) => {
     try {
         // Start a transaction
         await connection.beginTransaction();
+
+        //check Coin already is exists or not
+        const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
+        const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
+        if (isExistCoinResult[0].length > 0) {
+            return error422(" Coin is already exists.", res);
+        }
+        
         // Start a transaction
         let coinQuery = `SELECT * FROM coins
         WHERE status = 1`;
