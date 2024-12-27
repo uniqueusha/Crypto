@@ -273,7 +273,7 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             message: "Target Status Update successfully",
         });
     }catch (error) {
-        console.log(error);
+        
         
         return error500(error, res);
     } finally {
@@ -481,7 +481,7 @@ const updateSellSold = async (req, res) => {
                         WHERE untitled_id = ? AND complition_id = 3`;
                     
                     const updateStatusResult = await connection.query(updateSoldQuery, [complition_id, untitledId]);
-                    console.log(updateStatusResult);
+                   
                 }
                 
         } 
@@ -494,7 +494,7 @@ const updateSellSold = async (req, res) => {
             message: "Sell To Sold Update successfully",
         });
     }catch (error) {
-        console.log(error);
+        
         
         return error500(error, res);
     } finally {
