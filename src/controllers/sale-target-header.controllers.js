@@ -59,9 +59,9 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            let final_sale_price = base_price * return_x;
+            // let final_sale_price = base_price * return_x;
 
-            const insertSaleTargetHeaderQuery = `INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
@@ -87,7 +87,7 @@ const addSaleTargetHeader = async (req, res) => {
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
 
-                let insertSetTargetFooterQuery = 'INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)';
+                let insertSetTargetFooterQuery = "INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)";
                 let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
 
@@ -220,9 +220,9 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             
                 // Check if currentPrice is less than saleTarget
                 if (currantPrice > saleTarget) {
-                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 2 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 3 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget]);
-                 
+                    
                     const fetchSetTagetQuery = ` SELECT sth.*, stf.* FROM sale_target_header sth
                     LEFT JOIN set_target_footer stf
                     ON sth.sale_target_id = stf.sale_target_id WHERE sth.untitled_id = ?`;
@@ -445,11 +445,68 @@ const getSetTargetDownload = async (req, res) => {
     }
 };
 
-
+// sell to sold update 
+const updateSellSold = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    let connection = await getConnection();
+    try {
+        
+        //Start the transaction
+        await connection.beginTransaction();
+        
+        const getSaleTargetHeaderQuery = `SELECT sth.currant_price, sth.untitled_id, stf.sale_target, stf.untitled_id AS footer_untitled_id,stf.complition_id  FROM sale_target_header sth
+        LEFT JOIN set_target_footer stf
+        ON stf.sale_target_id = sth.sale_target_id
+        WHERE stf.untitled_id = ?`;
+        
+        const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
+        
+        const resultReverse = result[0].reverse();
+        
+        // Check if result contains rows
+        if (resultReverse && resultReverse.length > 0) {
+            // Loop through the results to compare the values
+            
+            for (let i = 0; i < resultReverse.length; i++) {
+                const row = resultReverse[i];
+                const complitionId = parseFloat(row.complition_id);
+                const complition_id = req.body.complition_id ? req.body.complition_id: '';
+                
+            
+                // Check if currentPrice is less than saleTarget
+                if (complitionId == 3) {
+                    const updateSoldQuery = `
+                        UPDATE set_target_footer 
+                        SET complition_id = ? 
+                        WHERE untitled_id = ? AND complition_id = 3`;
+                    
+                    const updateStatusResult = await connection.query(updateSoldQuery, [complition_id, untitledId]);
+                    console.log(updateStatusResult);
+                }
+                
+        } 
+        
+    }
+        //commit the transation
+        await connection.commit();
+        res.status(200).json({
+            status: 200,
+            message: "Sell To Sold Update successfully",
+        });
+    }catch (error) {
+        console.log(error);
+        
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+ 
 module.exports = {
     addSaleTargetHeader,
     currantPriceUpdateTargetComplitionStatus,
     createCurrentPrice,
     getSetTargets,
-    getSetTargetDownload
+    getSetTargetDownload,
+    updateSellSold
 }
