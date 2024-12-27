@@ -445,6 +445,8 @@ const updateSellSold = async (req, res) => {
                 const complitionId = parseFloat(row.complition_id);
                 const complition_id = req.body.complition_id ? parseInt(req.body.complition_id) : '';
                 const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
+                const set_footer_id = req.body.set_footer_id ? parseFloat(req.body.set_footer_id) : '';
+
 
                 // Check if completion ID is 3
                 if (complitionId === 3) {
@@ -452,8 +454,8 @@ const updateSellSold = async (req, res) => {
                     const updateSoldQuery = `
                         UPDATE set_target_footer 
                         SET complition_id = ?
-                        WHERE untitled_id = ? AND complition_id = 3`;
-                    await connection.query(updateSoldQuery, [complition_id, untitledId]);
+                        WHERE untitled_id = ? AND complition_id = 3 AND set_footer_id = ?`;
+                    await connection.query(updateSoldQuery, [complition_id, untitledId, set_footer_id]);
 
                     // Insert into sold_coin table if complition_id is 4
                     if (complition_id === 4) {
