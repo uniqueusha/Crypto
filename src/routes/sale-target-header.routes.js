@@ -7,7 +7,7 @@ const checkAuth = require("../middleware/check.auth");
 router.post('/', checkAuth, saleTargetHeaderController.addSaleTargetHeader);
 router.post('/currant-price', saleTargetHeaderController.createCurrentPrice);
 router.get('/', checkAuth, saleTargetHeaderController.getSetTargets);
-router.get('/download-set-target', saleTargetHeaderController.getSetTargetDownload);
+router.get('/download-set-target', checkAuth, saleTargetHeaderController.getSetTargetDownload);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
 router.patch('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
 
