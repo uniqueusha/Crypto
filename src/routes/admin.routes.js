@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/admin.controllers");
-// const checkAuth = require("../../middleware/check.auth");
+const checkAuth = require("../middleware/check.auth");
 
 //Add User
 router.post('/', userController.addUser);
 //Get List
-router.get('/',userController.getUsers);
+router.get('/', userController.getUsers);
 //login
 router.post('/login',userController.userLogin);
 //Active list
