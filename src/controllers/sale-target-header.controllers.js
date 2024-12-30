@@ -486,8 +486,9 @@ const getSetTargetDownload = async (req, res) => {
             
         }
 
+        
         if (flattenedData.length === 0) {
-            return res.status(404).send("No data found.");
+            return error422("No data found.", res);
         }
 
         // Create a new workbook
@@ -684,6 +685,34 @@ const updateSellSold = async (req, res) => {
     }
 };
 
+const getSetTargetCount = async (req, res) => {
+    // const { created_at, user_id } = req.query;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        let set_target_count = 0;
+        
+        let setTargetCountQuery = `SELECT COUNT(*) AS total FROM sale_target_header`;
+        let setTargetCountResult = await connection.query(setTargetCountQuery);
+        set_target_count = parseInt(setTargetCountResult[0][0].total);
+
+        const data = {
+            status: 200,
+            message: "Set Target Count retrieved successfully",
+            set_target_count: set_target_count
+        };
+
+        return res.status(200).json(data);
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
 
 
 
@@ -694,5 +723,6 @@ module.exports = {
     createCurrentPrice,
     getSetTargets,
     getSetTargetDownload,
-    updateSellSold
+    updateSellSold,
+    getSetTargetCount
 }
