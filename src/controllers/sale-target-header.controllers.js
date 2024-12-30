@@ -226,12 +226,8 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             
                 // Check if currentPrice is less than saleTarget
                 if (currantPrice > saleTarget ) {
-                    
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 3 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget]);
-                
-                     
-       
                 } else {
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 1, complition_id = 2 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
@@ -245,8 +241,6 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
             message: "Target Status Update successfully",
         });
     }catch (error) {
-        
-        
         return error500(error, res);
     } finally {
         await connection.release();
@@ -330,18 +324,109 @@ const getSetTargets = async (req, res) => {
 };
 
 //
+// const getSetTargetDownload = async (req, res) => {
+//     const { key } = req.query;
+    
+//     // attempt to obtain a database connection
+//     let connection = await getConnection();
+//     try {
+
+//         //start a transaction
+//         await connection.beginTransaction();
+
+//         let getSetTargetQuery = `SELECT * FROM sale_target_header`;
+//         let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header `;
+
+//         if (key) {
+//             const lowercaseKey = key.toLowerCase().trim();
+//             if (lowercaseKey === "activated") {
+//                 getSetTargetQuery += ` WHERE status = 1`;
+//                 countQuery += ` WHERE status = 1`;
+//             } else if (lowercaseKey === "deactivated") {
+//                 getSetTargetQuery += ` WHERE status = 0`;
+//                 countQuery += ` WHERE status = 0`;
+//             } else {
+//                 getSetTargetQuery += ` WHERE  LOWER(coin) LIKE '%${lowercaseKey}%' `;
+//                 countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%' `;
+//             }
+//         }
+//         getSetTargetQuery += " ORDER BY sale_date DESC";
+//         // Apply pagination if both page and perPage are provided
+        
+//         let result = await connection.query(getSetTargetQuery);
+//         let setTarget = result[0];
+ 
+//         //get set_header_footer
+//         for (let i = 0; i < setTarget.length; i++) {
+//             const element = setTarget[i];
+            
+//             const setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+//             const setFooterResult = await connection.query(setFooterQuery);
+//             setTarget[i]['footer']= setFooterResult[0].reverse();
+//             // console.log(setTarget);
+            
+//         }
+
+//         // Commit the transaction
+        
+//         const data = {
+//             status: 200,
+//             message: "Set Target Download retrieved successfully",
+//             data: setTarget
+           
+//         };
+        
+//         if (data.length === 0) {
+//             return res.status(404).send('No data found in the "adha" table.');
+//         }
+
+//         // Create a new workbook
+//         const workbook = xlsx.utils.book_new();
+
+//         // Create a worksheet and add data to it
+//         const worksheet = xlsx.utils.json_to_sheet(setTarget);
+
+
+//         // Add the worksheet to the workbook
+//         xlsx.utils.book_append_sheet(workbook, worksheet, 'setTargetInfo');
+
+//         // Create a unique file name (e.g., based on timestamp)
+//         const excelFileName = `exported_data_${Date.now()}.xlsx`;
+
+//         // Write the workbook to a file
+//         xlsx.writeFile(workbook, excelFileName);
+
+//         // Send the file to the client for download
+//         res.download(excelFileName, (err) => {
+//             if (err) {
+//                 // Handle any errors that occur during download
+//                 console.error(err);
+//                 res.status(500).send('Error downloading the file.');
+//             } else {
+//                 // Delete the file after it's been sent
+//                 fs.unlinkSync(excelFileName);
+//             }
+//         });
+//          // Commit the transaction
+//          await connection.commit();
+//     } catch (error) {
+//         return error500(error, res);
+//     }finally {
+//         if (connection) connection.release()
+//     }
+// };
+
 const getSetTargetDownload = async (req, res) => {
     const { key } = req.query;
-    
-    // attempt to obtain a database connection
+
+    // Attempt to obtain a database connection
     let connection = await getConnection();
     try {
-
-        //start a transaction
+        // Start a transaction
         await connection.beginTransaction();
 
         let getSetTargetQuery = `SELECT * FROM sale_target_header`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header `;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
@@ -352,46 +437,71 @@ const getSetTargetDownload = async (req, res) => {
                 getSetTargetQuery += ` WHERE status = 0`;
                 countQuery += ` WHERE status = 0`;
             } else {
-                getSetTargetQuery += ` WHERE  LOWER(coin) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%' `;
+                getSetTargetQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%'`;
+                countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%'`;
             }
         }
         getSetTargetQuery += " ORDER BY sale_date DESC";
-        // Apply pagination if both page and perPage are provided
-        
+
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
- 
-        //get set_header_footer
+
+        // Prepare flattened data for Excel
+        let flattenedData = [];
+
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
-            
-            let setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
-            setFooterResult = await connection.query(setFooterQuery);
-            setTarget[i]['footer']= setFooterResult[0].reverse();
+
+            // Fetch footer data for each sale_target
+            const setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+            const setFooterResult = await connection.query(setFooterQuery);
+
+            // If there are footer rows, add each to the flattenedData array
+            if (setFooterResult[0].length > 0) {
+                setFooterResult[0].forEach((footer) => {
+                    flattenedData.push({
+                        sale_target_id: element.sale_target_id,
+                        sale_date: element.sale_date,
+                        coin: element.coin,
+                        base_price: element.base_price,
+                        currant_price: element.currant_price,
+                        return_x: element.return_x,
+                        final_sale_price: element.final_sale_price,
+                        available_coins: element.available_coins,
+                        sale_target_coin: footer.sale_target_coin,
+                        sale_target: footer.sale_target,
+                        target_id: footer.target_id,
+                        complition_id: footer.complition_id,
+                        footer_percent: footer.sale_target_percent,
+                    });
+                });
+            } 
+            // else {
+            //     // If no footer rows, include the sale target data without footer
+            //     flattenedData.push({
+            //         sale_target_id: element.sale_target_id,
+            //         coin: element.coin,
+            //         sale_date: element.sale_date,
+            //         status: element.status,
+            //         footer_id: null,
+            //         footer_target: null,
+            //         footer_percent: null,
+            //     });
+            // }
         }
 
-        // Commit the transaction
-        
-        const data = {
-            status: 200,
-            message: "Set Target retrieved successfully",
-            data: setTarget,
-        };
-        
-        if (data.length === 0) {
-            return res.status(404).send('No data found in the "adha" table.');
+        if (flattenedData.length === 0) {
+            return res.status(404).send("No data found.");
         }
 
         // Create a new workbook
         const workbook = xlsx.utils.book_new();
 
-        // Create a worksheet and add data to it
-        const worksheet = xlsx.utils.json_to_sheet(setTarget);
-
+        // Create a worksheet and add flattened data to it
+        const worksheet = xlsx.utils.json_to_sheet(flattenedData);
 
         // Add the worksheet to the workbook
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'setTargetInfo');
+        xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
 
         // Create a unique file name (e.g., based on timestamp)
         const excelFileName = `exported_data_${Date.now()}.xlsx`;
@@ -404,18 +514,19 @@ const getSetTargetDownload = async (req, res) => {
             if (err) {
                 // Handle any errors that occur during download
                 console.error(err);
-                res.status(500).send('Error downloading the file.');
+                res.status(500).send("Error downloading the file.");
             } else {
                 // Delete the file after it's been sent
                 fs.unlinkSync(excelFileName);
             }
         });
-         // Commit the transaction
-         await connection.commit();
+
+        // Commit the transaction
+        await connection.commit();
     } catch (error) {
         return error500(error, res);
-    }finally {
-        if (connection) connection.release()
+    } finally {
+        if (connection) connection.release();
     }
 };
 
