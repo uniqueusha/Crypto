@@ -233,7 +233,7 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
                      
        
                 } else {
-                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 1, complition_id = 1 WHERE untitled_id = ? AND sale_target = ?';
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 1, complition_id = 2 WHERE untitled_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query (updateStatusQuery, [ untitledId, saleTarget])
                 }
         }

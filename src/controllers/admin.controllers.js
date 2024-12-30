@@ -181,7 +181,7 @@ const addUser = async (req, res) => {
             message: `User added successfully`,
         });
     } catch (error) {
-        console.log(error);
+       
         
         await connection.rollback();
         return error500(error, res);
@@ -220,7 +220,7 @@ const userLogin = async (req, res) => {
 
         const isPasswordValid = await bcrypt.compare(password,user_contrasena.extenstions);
         if (!isPasswordValid) {
-            return error422("Password worng.", res);
+            return error422("Password wrong.", res);
         }
         // Generate a JWT token
         const token = jwt.sign(
