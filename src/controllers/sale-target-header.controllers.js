@@ -454,12 +454,18 @@ const getSetTargetDownload = async (req, res) => {
             const element = setTarget[i];
 
             // Fetch footer data for each sale_target
-            const setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id} AND untitled_id = ${untitledId}`;
+            const setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+            LEFT JOIN target_status ts
+            ON ts.target_id = stf.target_id
+            LEFT JOIN complition_status cs
+            ON cs.complition_id = stf.complition_id 
+            WHERE stf.sale_target_id = ${element.sale_target_id} AND
+            stf. untitled_id = ${untitledId}`;
             const setFooterResult = await connection.query(setFooterQuery);
-
+            const setFooterResultReverse = setFooterResult[0].reverse(); 
             // If there are footer rows, add each to the flattenedData array
-            if (setFooterResult[0].length > 0) {
-                setFooterResult[0].forEach((footer) => {
+            if (setFooterResultReverse.length > 0) {
+                setFooterResultReverse.forEach((footer) => {
                     flattenedData.push({
                         sale_target_id: element.sale_target_id,
                         sale_date: element.sale_date,
@@ -471,8 +477,8 @@ const getSetTargetDownload = async (req, res) => {
                         available_coins: element.available_coins,
                         sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
-                        target_id: footer.target_id,
-                        complition_id: footer.complition_id,
+                        target_status: footer.target_status,
+                        complition_status: footer.complition_status,
                         footer_percent: footer.sale_target_percent,
                     });
                 });
