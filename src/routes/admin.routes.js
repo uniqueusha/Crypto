@@ -11,6 +11,8 @@ router.get('/',userController.getUsers);
 router.post('/login',userController.userLogin);
 //Active list
 router.get('/wma',userController.getUserWma);
+//user count
+router.get('/user-count', userController.getUserCount);
 //get list by id
 router.get('/:id',userController.getUser);
 //update user

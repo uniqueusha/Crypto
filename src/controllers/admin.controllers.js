@@ -512,6 +512,40 @@ const getUserWma = async (req, res, next) => {
     }
 };
 
+//user count
+const getUserCount = async (req, res) => {
+    // const { created_at, user_id } = req.query;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        let admin_user_count = 0;
+        
+        let adminUserCountQuery = `SELECT COUNT(*) AS total FROM untitled
+            WHERE user_type_id = 2 AND status = 1`;
+        let adminUserCountResult = await connection.query(adminUserCountQuery);
+        admin_user_count = parseInt(adminUserCountResult[0][0].total);
+
+        const data = {
+            status: 200,
+            message: "User Count retrieved successfully",
+            admin_user_count: admin_user_count
+        };
+
+        return res.status(200).json(data);
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+
+
+
+
 module.exports = {
     addUser,
     userLogin,
@@ -519,6 +553,7 @@ module.exports = {
     getUser,
     updateUser,
     onStatusChange,
-    getUserWma
+    getUserWma,
+    getUserCount
 
 }
