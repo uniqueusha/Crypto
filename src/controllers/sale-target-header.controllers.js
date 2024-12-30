@@ -323,7 +323,7 @@ const getSetTargets = async (req, res) => {
     }
 };
 
-//
+// Set Target DownLoad
 // const getSetTargetDownload = async (req, res) => {
 //     const { key } = req.query;
     
@@ -417,6 +417,7 @@ const getSetTargets = async (req, res) => {
 // };
 
 const getSetTargetDownload = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
     const { key } = req.query;
 
     // Attempt to obtain a database connection
@@ -425,8 +426,8 @@ const getSetTargetDownload = async (req, res) => {
         // Start a transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT * FROM sale_target_header`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header`;
+        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId}`;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId}`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
@@ -453,7 +454,7 @@ const getSetTargetDownload = async (req, res) => {
             const element = setTarget[i];
 
             // Fetch footer data for each sale_target
-            const setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id}`;
+            const setFooterQuery = `SELECT * FROM set_target_footer WHERE sale_target_id = ${element.sale_target_id} AND untitled_id = ${untitledId}`;
             const setFooterResult = await connection.query(setFooterQuery);
 
             // If there are footer rows, add each to the flattenedData array
@@ -476,18 +477,7 @@ const getSetTargetDownload = async (req, res) => {
                     });
                 });
             } 
-            // else {
-            //     // If no footer rows, include the sale target data without footer
-            //     flattenedData.push({
-            //         sale_target_id: element.sale_target_id,
-            //         coin: element.coin,
-            //         sale_date: element.sale_date,
-            //         status: element.status,
-            //         footer_id: null,
-            //         footer_target: null,
-            //         footer_percent: null,
-            //     });
-            // }
+            
         }
 
         if (flattenedData.length === 0) {
