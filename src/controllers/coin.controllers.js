@@ -388,11 +388,47 @@ const getCoinActiveCurrentPrice = async (req, res) => {
     }
 };
 
+//coin already exist
+const checkCoinName = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    const coin = req.body.coin ? req.body.coin.trim() : "";
+    if (!coin) {
+        return error422("Coin is required.", res);
+    } 
+    
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        //Start the transaction
+        await connection.beginTransaction();
+        
+    //check Coin already is exists or not
+        const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
+        const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitledId]);
+        if (isExistCoinResult[0].length > 0) {
+            return error422(" Coin is already exists.", res);
+        }
+
+        res.status(200).json({
+            status: 200,
+            message: `Coin Add`,
+        });
+    } catch (error) {
+        console.log(error);
+        
+        await connection.rollback();
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+
 
 module.exports = {
     addCoin,
     getCoins,
     getCoin,
     getCoinWma,
-    getCoinActiveCurrentPrice
+    getCoinActiveCurrentPrice,
+    checkCoinName
 }
