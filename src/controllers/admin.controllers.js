@@ -259,6 +259,7 @@ const userLogin = async (req, res) => {
 //Get users list...
 const getUsers = async (req, res) => {
     const { page, perPage, key } = req.query;
+    
     // Attempt to obtain a database connection
     let connection = await getConnection();
     try {
@@ -267,25 +268,27 @@ const getUsers = async (req, res) => {
 
         let getUserQuery = `SELECT u.*,ut.user_type FROM untitled u
         LEFT JOIN user_type ut
-        ON u.user_type_id = ut.user_type_id`;
+        ON u.user_type_id = ut.user_type_id
+        WHERE u.user_type_id = 2`;
         let countQuery = `SELECT COUNT(*) AS total FROM untitled u
         LEFT JOIN user_type ut
-        ON u.user_type_id = ut.user_type_id`;
+        ON u.user_type_id = ut.user_type_id
+        WHERE u.user_type_id = 2`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
-                getUserQuery += ` WHERE status = 1`;
-                countQuery += ` WHERE status = 1`;
+                getUserQuery += ` WHERE u.status = 1`;
+                countQuery += ` WHERE u.status = 1`;
             } else if (lowercaseKey === "deactivated") {
-                getUserQuery += ` WHERE status = 0`;
-                countQuery += ` WHERE status = 0`;
+                getUserQuery += ` WHERE u.status = 0`;
+                countQuery += ` WHERE u.status = 0`;
             } else {
-                getUserQuery += ` WHERE  LOWER(user_name) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` WHERE LOWER(user_name) LIKE '%${lowercaseKey}%' `;
+                getUserQuery += ` WHERE  LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` WHERE LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
             }
         }
-        getUserQuery += " ORDER BY cts DESC";
+        getUserQuery += " ORDER BY u.cts DESC";
         // Apply pagination if both page and perPage are provided
         let total = 0;
         if (page && perPage) {
@@ -315,6 +318,8 @@ const getUsers = async (req, res) => {
 
         return res.status(200).json(data);
     } catch (error) {
+        console.log(error);
+        
         return error500(error, res);
     } finally {
         await connection.release();
