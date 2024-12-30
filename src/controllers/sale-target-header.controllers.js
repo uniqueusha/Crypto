@@ -686,6 +686,7 @@ const updateSellSold = async (req, res) => {
 };
 
 const getSetTargetCount = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
     // const { created_at, user_id } = req.query;
     // Attempt to obtain a database connection
     let connection = await getConnection();
@@ -696,7 +697,7 @@ const getSetTargetCount = async (req, res) => {
 
         let set_target_count = 0;
         
-        let setTargetCountQuery = `SELECT COUNT(*) AS total FROM sale_target_header`;
+        let setTargetCountQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
         let setTargetCountResult = await connection.query(setTargetCountQuery);
         set_target_count = parseInt(setTargetCountResult[0][0].total);
 
