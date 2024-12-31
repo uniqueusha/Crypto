@@ -288,7 +288,7 @@ const getUsers = async (req, res) => {
                 countQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
             }
         }
-        getUserQuery += " ORDER BY u.cts DESC";
+       
         // Apply pagination if both page and perPage are provided
         let total = 0;
         if (page && perPage) {
@@ -304,7 +304,7 @@ const getUsers = async (req, res) => {
         const data = {
             status: 200,
             message: "User retrieved successfully",
-            data: user,
+            data: user
         };
         // Add pagination information if provided
         if (page && perPage) {
@@ -318,8 +318,6 @@ const getUsers = async (req, res) => {
 
         return res.status(200).json(data);
     } catch (error) {
-        console.log(error);
-        
         return error500(error, res);
     } finally {
         await connection.release();

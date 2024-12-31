@@ -98,7 +98,7 @@ const addSaleTargetHeader = async (req, res) => {
             await connection.commit();
             res.status(200).json({
                 status: 200,
-                message: "Sale Target Added successfully",
+                message: "Set Target Added successfully",
             });
         }catch (error) {
             return error500(error, res);
