@@ -59,7 +59,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            // let final_sale_price = base_price * return_x;
+            let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -75,7 +75,9 @@ const addSaleTargetHeader = async (req, res) => {
                     continue;
                 }
                 
-                sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
+                // sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
+                sale_target = sale_target - ((sale_target - base_price) / 4);
+
                 if (i == 0) {
                     sale_target = final_sale_price
                 }
@@ -91,8 +93,7 @@ const addSaleTargetHeader = async (req, res) => {
                 let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
 
-
-                
+   
             }
             //commit the transation
             await connection.commit();
