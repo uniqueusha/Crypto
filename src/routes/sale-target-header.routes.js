@@ -9,7 +9,9 @@ router.post('/currant-price', saleTargetHeaderController.createCurrentPrice);
 router.get('/', checkAuth, saleTargetHeaderController.getSetTargets);
 router.get('/set-target-count', checkAuth, saleTargetHeaderController.getSetTargetCount);
 router.get('/download-set-target', checkAuth, saleTargetHeaderController.getSetTargetDownload);
+router.get('/:id', checkAuth, saleTargetHeaderController.getSetTarget);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
+router.put('/:id', checkAuth, saleTargetHeaderController.updateSetTarget);
 router.patch('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
 
 module.exports = router
