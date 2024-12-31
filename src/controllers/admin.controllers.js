@@ -278,14 +278,14 @@ const getUsers = async (req, res) => {
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
-                getUserQuery += ` WHERE u.status = 1`;
-                countQuery += ` WHERE u.status = 1`;
+                getUserQuery += ` AND u.status = 1`;
+                countQuery += ` AND u.status = 1`;
             } else if (lowercaseKey === "deactivated") {
-                getUserQuery += ` WHERE u.status = 0`;
-                countQuery += ` WHERE u.status = 0`;
+                getUserQuery += ` AND u.status = 0`;
+                countQuery += ` AND u.status = 0`;
             } else {
-                getUserQuery += ` WHERE  LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` WHERE LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
+                getUserQuery += ` AND  LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
             }
         }
         getUserQuery += " ORDER BY u.cts DESC";

@@ -5,8 +5,6 @@ const checkAuth = require("../middleware/check.auth");
 
 // add coin
 router.post('/',coinController.addCoin);
-//check coin exist
-router.post('/check-coin', checkAuth, coinController.checkCoinName);
 //get all coin list
 router.get('',coinController.getCoins);
 //active list 
