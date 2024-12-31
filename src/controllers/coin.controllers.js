@@ -321,8 +321,6 @@ const getCoinActiveCurrentPrice = async (req, res) => {
             const element = coinResult[i];
             const tricker = element.short_name; // Short name of the coin
 
-            console.log('Coin Name:', tricker);
-
             if (tricker) {
                 // Fetch URL, tricker, and currency_name from the api_settings table
                 const query = 'SELECT url, tricker, currency_name FROM api_settings WHERE tricker = ?';
@@ -342,15 +340,13 @@ const getCoinActiveCurrentPrice = async (req, res) => {
                             const response = await axios.get(fullUrl);
                             const price = response.data.USD; // Assuming the API returns a price in USD
 
-                            console.log(`Price for ${tricker}:`, price);
-
                             // Add the coin price to the result array
                             coinPrices.push({
                                 tricker,
                                 price,
                             });
                         } catch (apiError) {
-                            console.error(`Error fetching price for ${tricker}:`, apiError.message);
+                            // console.error(`Error fetching price for ${tricker}:`, apiError.message);
                             coinPrices.push({
                                 tricker,
                                 price: null,
@@ -359,7 +355,7 @@ const getCoinActiveCurrentPrice = async (req, res) => {
                         }
                     }
                 } else {
-                    console.warn(`No API settings found for tricker: ${tricker}`);
+                    // console.warn(`No API settings found for tricker: ${tricker}`);
                     coinPrices.push({
                         tricker,
                         price: null,
@@ -379,7 +375,7 @@ const getCoinActiveCurrentPrice = async (req, res) => {
             data: coinPrices, // Return the coin prices as part of the response
         });
     } catch (error) {
-        console.error('Error:', error.message);
+        // console.error('Error:', error.message);
         error500(error, res); // Handle the error
     } finally {
         if (connection) {
