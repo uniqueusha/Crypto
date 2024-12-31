@@ -677,7 +677,7 @@ const updateSellSold = async (req, res) => {
     } catch (error) {
         // Rollback the transaction in case of error
         if (connection) await connection.rollback();
-        console.error(error);
+       
         return error500(error, res);
     } finally {
         // Release the connection
