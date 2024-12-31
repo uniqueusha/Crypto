@@ -716,8 +716,132 @@ const getSetTargetCount = async (req, res) => {
     }
 };
 
+//Update Set Target
+const updateSetTarget = async (req, res) => {
+    const  sale_target_id = parseInt(req.params.id);
+    const coin = req.body.coin ? req.body.coin: '';
+    const base_price = req.body.base_price ? req.body.base_price: '';
+    const currant_price = req.body.currant_price ? req.body.currant_price: '';
+    const return_x = req.body.return_x ? req.body.return_x: '';
+    const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price: '';
+    const available_coins = req.body.available_coins ? req.body.available_coins	: '';
+    const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter: [];
+    const untitled_id = req.companyData.untitled_id;
+    if (!coin) {
+        return error422("Coin is required.", res);
+    }  else if (!base_price) {
+        return error422("Base Price is required.", res);
+    }  else if (!return_x) {
+        return error422("Return_x is required.", res);
+    }  else if (!available_coins) {
+        return error422("Available Coins is required.", res);
+    } 
 
+    // Check if sale target header exists
+    const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
+    const saleTargetHeaderResult = await pool.query(saleTargetHeaderQuery, [sale_target_id]);
+    if (saleTargetHeaderResult[0].length === 0) {
+        return error422("Sale Target Header Not Found.", res);
+    }
 
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+        let final_sale_price = base_price * return_x;
+
+        // Update Task Heater
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET coin = ?,base_price = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [coin, base_price, currant_price, return_x, final_sale_price, available_coins, sale_target_id, untitled_id]);
+        
+        //update into sale target header
+        let setTargetFooterArray = setTargetFooter.reverse();
+        let sale_target = final_sale_price
+
+        for (let i =0 ; i < setTargetFooterArray.length; i++) {
+            const element = setTargetFooterArray[i];
+            if (!element || typeof element !== 'object') {
+                continue;
+            }
+            // sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
+            sale_target = sale_target - ((sale_target - base_price) / 4);
+
+            if (i == 0) {
+                sale_target = final_sale_price
+            }
+            
+            const set_footer_id = element.set_footer_id ? element.set_footer_id : '';
+
+            const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
+            // const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
+            
+            const targetValue = (available_coins / 100) * sale_target_coin;
+
+            let updateSetTargetFooterQuery = `UPDATE set_target_footer SET sale_target_id = ?, sale_target_coin = ?, sale_target = ? WHERE sale_target_id = ? AND set_footer_id = ? AND untitled_id = ?`;
+            let updateSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_id, set_footer_id, untitled_id];
+            let updateSetTargetFooterResult = await connection.query(updateSetTargetFooterQuery, updateSetTargetFootervalues);
+        }
+        // Commit the transaction
+        await connection.commit();
+        return res.status(200).json({
+            status: 200,
+            message: "Set Target updated successfully.",
+        });
+    } catch (error) {
+        await connection.rollback();
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+
+//set target by id
+const getSetTarget = async (req, res) => {
+    const  sale_target_id = parseInt(req.params.id);
+    const untitledId = req.companyData.untitled_id;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        //Start the transaction
+        await connection.beginTransaction();
+
+        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE sale_target_id = ${sale_target_id} AND untitled_id = ${untitledId} `;
+        let result = await connection.query(getSetTargetQuery);
+        if (result[0].length == 0) {
+            return error422("Sale target Header Not Found.", res);
+       }
+        let setTarget = result[0][0];
+ 
+        //get set_header_footer
+        
+            let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+            LEFT JOIN target_status ts
+            ON ts.target_id = stf.target_id
+            LEFT JOIN complition_status cs
+            ON cs.complition_id = stf.complition_id 
+            WHERE stf.sale_target_id = ? AND
+            stf. untitled_id = ${untitledId}`;
+            setFooterResult = await connection.query(setFooterQuery, [sale_target_id]);
+            setTarget['footer']= setFooterResult[0].reverse();
+        
+
+        const data = {
+            status: 200,
+            message: "Set Target retrieved successfully",
+            data: setTarget,
+        };
+        
+        return res.status(200).json(data);
+    } catch (error) {
+        console.log(error);
+        
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
+};
 
 module.exports = {
     addSaleTargetHeader,
@@ -726,5 +850,7 @@ module.exports = {
     getSetTargets,
     getSetTargetDownload,
     updateSellSold,
-    getSetTargetCount
+    getSetTargetCount,
+    updateSetTarget,
+    getSetTarget
 }
