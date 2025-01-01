@@ -262,7 +262,7 @@ const getSetTargets = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} `;
+        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
         let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
 
         if (key) {
@@ -849,6 +849,63 @@ const getSetTarget = async (req, res) => {
     }
 };
 
+//delete for forntend not database change status 
+const deleteSetTargetChangeStatus = async (req, res) => {
+    const sale_target_id = parseInt(req.params.id);
+    const untitledId = req.companyData.untitled_id;
+    const status = parseInt(req.query.status); // Validate and parse the status parameter
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+        // Check if the set target  exists
+        const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ? AND untitled_id = ?";
+        const saleTargetHeaderResult = await connection.query(saleTargetHeaderQuery, [sale_target_id, untitledId]);
+        if (saleTargetHeaderResult[0].length == 0) {
+            return res.status(404).json({
+                status: 404,
+                message: "Sale Target Header Not Found.",
+            });
+        }
+
+        // Validate the status parameter
+        if (status !== 0 && status !== 1) {
+            return res.status(400).json({
+                status: 400,
+                message:
+                    "Invalid status value. Status must be 0 (inactive) or 1 (active).",
+            });
+        }
+
+        // Soft update the set target status
+        const updateQuery = `
+              UPDATE sale_target_header
+              SET status = ?
+              WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updateQuery, [status, sale_target_id, untitledId]);
+
+        const updatefooterQuery = `
+              UPDATE set_target_footer
+              SET status = ?
+              WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatefooterQuery, [status, sale_target_id, untitledId]);
+    
+        const statusMessage = status === 1 ? "activated" : "deactivated";
+        //commit the transation
+        await connection.commit();
+        return res.status(200).json({
+            status: 200,
+            message: `Set Target ${statusMessage} successfully.`,
+        });
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+
 module.exports = {
     addSaleTargetHeader,
     currantPriceUpdateTargetComplitionStatus,
@@ -858,5 +915,6 @@ module.exports = {
     updateSellSold,
     getSetTargetCount,
     updateSetTarget,
-    getSetTarget
+    getSetTarget,
+    deleteSetTargetChangeStatus
 }

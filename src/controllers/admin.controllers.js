@@ -487,7 +487,7 @@ const onStatusChange = async (req, res) => {
 };
 
 //get user active...
-const getUserWma = async (req, res, next) => {
+const getUserWma = async (req, res) => {
 
     // Attempt to obtain a database connection
     let connection = await getConnection();
