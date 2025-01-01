@@ -13,5 +13,6 @@ router.get('/:id', checkAuth, saleTargetHeaderController.getSetTarget);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
 router.put('/:id', checkAuth, saleTargetHeaderController.updateSetTarget);
 router.patch('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
+router.delete('/:id', checkAuth, saleTargetHeaderController.deleteSetTargetChangeStatus);
 
 module.exports = router
