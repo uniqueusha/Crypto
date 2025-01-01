@@ -29,6 +29,7 @@ error500 = (error, res) => {
     })
 };
 
+//Add Set target
 const addSaleTargetHeader = async (req, res) => {
         const coin = req.body.coin ? req.body.coin: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
@@ -51,7 +52,7 @@ const addSaleTargetHeader = async (req, res) => {
         try {
 
             //check Coin already is exists or not
-            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ?`;
+            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ? AND status = 1`;
             const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
             if (isExistCoinResult[0].length > 0) {
                 return error422(" Coin is already exists.", res);
@@ -59,7 +60,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            let final_sale_price = base_price * return_x;
+            // let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -76,7 +77,9 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 // sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
-                sale_target = sale_target - ((sale_target - base_price) / 4);
+                // if (i > 0) {
+                    sale_target = sale_target - ((sale_target - base_price) / 4);
+                // }
 
                 if (i == 0) {
                     sale_target = final_sale_price
@@ -88,11 +91,10 @@ const addSaleTargetHeader = async (req, res) => {
                 const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
-
+                
                 let insertSetTargetFooterQuery = "INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)";
                 let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
-
    
             }
             //commit the transation
@@ -144,9 +146,11 @@ const createCurrentPrice = async (req, res) => {
             }
         });
     }catch (error) {
+        console.log(error);
+        
         return error500(error, res);
     } finally {
-        await connection.release();
+        if (connection) connection.release();
     }
 };
 
@@ -681,8 +685,9 @@ const updateSellSold = async (req, res) => {
        
         return error500(error, res);
     } finally {
-        // Release the connection
-        if (connection) await connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
@@ -712,7 +717,9 @@ const getSetTargetCount = async (req, res) => {
     } catch (error) {
         return error500(error, res);
     } finally {
-        await connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
@@ -750,7 +757,7 @@ const updateSetTarget = async (req, res) => {
     try {
         // Start a transaction
         await connection.beginTransaction();
-        let final_sale_price = base_price * return_x;
+        // let final_sale_price = base_price * return_x;
 
         // Update Task Heater
         const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET coin = ?,base_price = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
@@ -793,13 +800,15 @@ const updateSetTarget = async (req, res) => {
         await connection.rollback();
         return error500(error, res);
     } finally {
-        await connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
 //set target by id
 const getSetTarget = async (req, res) => {
-    const  sale_target_id = parseInt(req.params.id);
+    const sale_target_id = parseInt(req.params.id);
     const untitledId = req.companyData.untitled_id;
     // Attempt to obtain a database connection
     let connection = await getConnection();
@@ -825,18 +834,15 @@ const getSetTarget = async (req, res) => {
             stf. untitled_id = ${untitledId}`;
             setFooterResult = await connection.query(setFooterQuery, [sale_target_id]);
             setTarget['footer']= setFooterResult[0].reverse();
-        
 
         const data = {
             status: 200,
             message: "Set Target retrieved successfully",
-            data: setTarget,
+            data: setTarget
         };
         
         return res.status(200).json(data);
     } catch (error) {
-        console.log(error);
-        
         return error500(error, res);
     } finally {
         if (connection) connection.release();
