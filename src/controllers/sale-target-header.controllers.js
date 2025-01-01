@@ -29,6 +29,7 @@ error500 = (error, res) => {
     })
 };
 
+//Add Set target
 const addSaleTargetHeader = async (req, res) => {
         const coin = req.body.coin ? req.body.coin: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
@@ -51,7 +52,7 @@ const addSaleTargetHeader = async (req, res) => {
         try {
 
             //check Coin already is exists or not
-            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ? status = 1`;
+            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin))= ? AND untitled_id = ? AND status = 1`;
             const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
             if (isExistCoinResult[0].length > 0) {
                 return error422(" Coin is already exists.", res);
@@ -76,7 +77,9 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 // sale_target = Math.round(sale_target -((sale_target-base_price)/4),0);
-                sale_target = sale_target - ((sale_target - base_price) / 4);
+                // if (i > 0) {
+                    sale_target = sale_target - ((sale_target - base_price) / 4);
+                // }
 
                 if (i == 0) {
                     sale_target = final_sale_price
@@ -88,11 +91,10 @@ const addSaleTargetHeader = async (req, res) => {
                 const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
-
+                
                 let insertSetTargetFooterQuery = "INSERT INTO set_target_footer (sale_target_id, sale_target_coin, sale_target, sale_target_percent, untitled_id) VALUES (?,?,?,?,?)";
                 let insertSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_percent, untitled_id];
                 let insertSetTargetFooterResult = await connection.query(insertSetTargetFooterQuery, insertSetTargetFootervalues);
-
    
             }
             //commit the transation
@@ -144,9 +146,11 @@ const createCurrentPrice = async (req, res) => {
             }
         });
     }catch (error) {
+        console.log(error);
+        
         return error500(error, res);
     } finally {
-        await connection.release();
+        if (connection) connection.release();
     }
 };
 
