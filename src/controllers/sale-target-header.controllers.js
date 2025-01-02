@@ -431,20 +431,20 @@ const getSetTargetDownload = async (req, res) => {
         // Start a transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId}`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId}`;
+        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
-                getSetTargetQuery += ` WHERE status = 1`;
-                countQuery += ` WHERE status = 1`;
+                getSetTargetQuery += ` AND status = 1`;
+                countQuery += ` AND status = 1`;
             } else if (lowercaseKey === "deactivated") {
-                getSetTargetQuery += ` WHERE status = 0`;
-                countQuery += ` WHERE status = 0`;
+                getSetTargetQuery += ` AND status = 0`;
+                countQuery += ` AND status = 0`;
             } else {
-                getSetTargetQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%'`;
-                countQuery += ` WHERE LOWER(coin) LIKE '%${lowercaseKey}%'`;
+                getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+                countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
             }
         }
         getSetTargetQuery += " ORDER BY sale_date DESC";
@@ -703,7 +703,7 @@ const getSetTargetCount = async (req, res) => {
 
         let set_target_count = 0;
         
-        let setTargetCountQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
+        let setTargetCountQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1 `;
         let setTargetCountResult = await connection.query(setTargetCountQuery);
         set_target_count = parseInt(setTargetCountResult[0][0].total);
 

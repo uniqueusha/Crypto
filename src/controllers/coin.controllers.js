@@ -29,34 +29,35 @@ const addCoin = async (req, res)=>{
    try {
     connection = await pool.getConnection();
     let response = await axios.get(
-        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+        // `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+        `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
       );
-    let rawData = response.data.Data
-          const responseArray = Object.keys(rawData).map(coin => ({
-        coin, // include the original key as a field
-        ...rawData[coin] // spread the object data
-    }));
+    let rawData = response.data.Data;
+    
+    // const responseArray = Object.keys(rawData).map(CoinInfo => ({
+    //     CoinInfo, // include the original key as a field
+    //     ...rawData[CoinInfo] // spread the object data
+    // }));
+    // console.log(responseArray[0].FullName);
     
     let emptyImageCount = 0;
     let duplicateCount = 0;
     let insertCount = 0;
     
-    for (let index = 0; index < responseArray.length; index++) {
-        const element = responseArray[index];
+    for (let index = 0; index < rawData.length; index++) {
+        const element = rawData[index].CoinInfo;
         
         let isExistCoinQuery = "SELECT * FROM coins WHERE TRIM(LOWER(ticker_symbol)) = ?";
-        let isExistCoinResult = await connection.query(isExistCoinQuery, [(element.Symbol).toLowerCase()]);
+        let isExistCoinResult = await connection.query(isExistCoinQuery, [(element.Symbol)]);
     
         if (!(isExistCoinResult[0].length > 0)) {
             if (element.ImageUrl) {
                 let coinQuery = "INSERT INTO coins (id, image_url, ticker_symbol, coin_name, short_name) VALUES (?, ?, ?, ?, ?)";
-                let coinValue = [element.Id, element.ImageUrl, element.Symbol, element.FullName, element.Symbol];
+                let coinValue = [element.Id, element.ImageUrl, element.Internal, element.FullName, element.Name];
                 const coinResult = await connection.query(coinQuery, coinValue);
     
                 insertCount++;
 
-                // console.log(element.Symbol);
-                
             } else {
                 // console.log("Image empty for symbol:", element.Symbol);
                 emptyImageCount++;
@@ -66,11 +67,6 @@ const addCoin = async (req, res)=>{
             duplicateCount++;
         }
     }
-    
-    // Log the counts
-    // console.log(`Total empty images: ${emptyImageCount}`);
-    // console.log(`Total duplicates: ${duplicateCount}`);
-    // console.log(`Total inserted: ${insertCount}`);
     
     connection.commit();
     res.status(200).json({
@@ -83,6 +79,8 @@ const addCoin = async (req, res)=>{
         }
     })
    } catch (error) {
+    console.log(error);
+    
     connection.rollback();
     return error500(error, res)
    } finally {
@@ -92,38 +90,160 @@ const addCoin = async (req, res)=>{
 };
 
 //get coins list...
-const getCoins = async(req, res)=>{
-    let connection;  
-    // return res.json("Hii")
+// const getCoins = async(req, res)=>{
+//     let connection;  
+//     // return res.json("Hii")
+//     try {
+//         connection = await pool.getConnection();
+
+//         let coinQuery = "SELECT * FROM coins";
+//         let coinResult = await connection.query(coinQuery)
+//         for (let index = 0; index < coinResult[0].length; index++) {
+//             const element = coinResult[0][index];
+//             // let response = await axios.get(
+//             //     `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${element.ticker_symbol}&tsyms=USD&api_key=c9dbe355a7cb4069138048c0f96468825e753dce674be4bb1e0af386b6c6e2cc`
+//             //   );
+//             // let ticker_symbol = Object.keys(response.data)
+            
+//             // let rawData = response.data[ticker_symbol[0]]
+//             // console.log(rawData);
+
+//         }
+//         connection.commit()
+//         return res.status(200).json({
+//             status:200,
+//             message:"Coins retrived successfully!",
+//             data:coinResult[0]
+//         })
+//     } catch (error) {
+//         await connection.rollback()
+//         return error500(error, res)
+//     } finally {
+//         if(connection) connection.release()
+//     }
+// };
+
+
+const getCoins = async (req, res) => {
+    let connection;
     try {
         connection = await pool.getConnection();
+        let response = await axios.get(
+            `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+        );
+        let rawData = response.data.Data;
+        let coinsData = [];
+        
 
-        let coinQuery = "SELECT * FROM coins";
-        let coinResult = await connection.query(coinQuery)
-        for (let index = 0; index < coinResult[0].length; index++) {
-            const element = coinResult[0][index];
-            // let response = await axios.get(
-            //     `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${element.ticker_symbol}&tsyms=USD&api_key=c9dbe355a7cb4069138048c0f96468825e753dce674be4bb1e0af386b6c6e2cc`
-            //   );
-            // let ticker_symbol = Object.keys(response.data)
+        // Loop through the data to log CoinInfo and DISPLAY information
+        for (let index = 0; index < rawData.length; index++) {
+            const coinInfo = rawData[index].CoinInfo;
+            const displayData = rawData[index].DISPLAY?.USD; 
             
-            // let rawData = response.data[ticker_symbol[0]]
-            // console.log(rawData);
+            
+            let coinDetails = {};
+            
+            if (coinInfo) {   
+                coinDetails.ImageUrl = coinInfo.ImageUrl; 
+                coinDetails.FullName = coinInfo.FullName;
+                coinDetails.Name = coinInfo.Name 
+            }
+            
+            if (displayData) {
+                coinDetails.PRICE = displayData.PRICE
+                const price = displayData.PRICE.replace(/[^0-9.-]+/g, "");
+                const openHour = displayData.OPENHOUR.replace(/[^0-9.-]+/g, "");
+                const open24HOUR = displayData.OPEN24HOUR.replace(/[^0-9.-]+/g, "");
+                coinDetails.OPENHOUR = displayData.OPENHOUR
+                let oneH = ((price - openHour) / openHour) * 100;
+                let one24H = ((price - open24HOUR) / open24HOUR) * 100;
+                
+                coinDetails.oneh = oneH.toFixed(3);
+                coinDetails.OPEN24HOUR = displayData.OPEN24HOUR;
+                coinDetails.one24h = one24H.toFixed(3);
 
+            coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
+            coinDetails.MKTCAP = displayData.MKTCAP;
+            }
+            coinsData.push(coinDetails);
+            
         }
-        connection.commit()
-        return res.status(200).json({
-            status:200,
-            message:"Coins retrived successfully!",
-            data:coinResult[0]
-        })
+
+        // Respond with success
+        res.status(200).json({
+            status: 200,
+            message: "Coins retrieved successfully!",
+            data:coinsData
+        });
     } catch (error) {
-        await connection.rollback()
-        return error500(error, res)
+        console.error(error);
+
+        if (connection) await connection.rollback();
+        return error500(error, res);
     } finally {
-        if(connection) connection.release()
+        if (connection) connection.release();
     }
 };
+
+// const getCoins = async (req, res) => {
+//     let connection;
+//     try {
+//         connection = await pool.getConnection();
+//         let response = await axios.get(
+//             `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+//         );
+//         let rawData = response.data.Data;
+//         let coinsData = [];
+
+//         // Loop through the data to log CoinInfo and DISPLAY information
+//         for (let index = 0; index < rawData.length; index++) {
+//             const coinInfo = rawData[index].CoinInfo;
+//             const displayData = rawData[index].DISPLAY?.USD; 
+
+//             let coinDetails = {};
+
+//             if (coinInfo) {   
+//                 coinDetails.ImageUrl = coinInfo.ImageUrl; 
+//                 coinDetails.FullName = coinInfo.FullName;
+//                 coinDetails.Name = coinInfo.Name;
+//             }
+
+//             if (displayData) {
+//                 coinDetails.PRICE = displayData.PRICE;
+
+//                 // Ensure the values are parsed as floats for calculation
+//                 const price = parseFloat(displayData.PRICE); // Remove non-numeric characters
+//                 const openHour = parseFloat(displayData.OPENHOUR.replace(/[^0-9.]+/g, "")); // Remove non-numeric characters
+
+//                 // Calculate percentage change for the past hour
+//                 const oneH = ((price - openHour) / openHour) * 100;
+//                 coinDetails.OPENHOUR = oneH.toFixed(2);  // Limiting to 2 decimal places
+
+//                 coinDetails.OPEN24HOUR = displayData.OPEN24HOUR;
+//                 coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
+//                 coinDetails.MKTCAP = displayData.MKTCAP;
+//             }
+
+//             coinsData.push(coinDetails);
+//         }
+
+//         // Respond with success
+//         res.status(200).json({
+//             status: 200,
+//             message: "Coins retrieved successfully!",
+//             data: coinsData
+//         });
+//     } catch (error) {
+//         console.error(error);
+
+//         if (connection) await connection.rollback();
+//         return error500(error, res);
+//     } finally {
+//         if (connection) connection.release();
+//     }
+// };
+
+
 
 // get coin by id...
 const getCoin = async (req, res) => {
