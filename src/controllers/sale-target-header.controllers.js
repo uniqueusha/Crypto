@@ -60,7 +60,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            // let final_sale_price = base_price * return_x;
+             let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -757,7 +757,7 @@ const updateSetTarget = async (req, res) => {
     try {
         // Start a transaction
         await connection.beginTransaction();
-        // let final_sale_price = base_price * return_x;
+        let final_sale_price = base_price * return_x;
 
         // Update Task Heater
         const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET coin = ?,base_price = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
