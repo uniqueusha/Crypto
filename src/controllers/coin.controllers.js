@@ -125,6 +125,7 @@ const addCoin = async (req, res)=>{
 
 
 const getCoins = async (req, res) => {
+    const { page, perPage, key } = req.query;
     let connection;
     try {
         connection = await pool.getConnection();
@@ -134,6 +135,10 @@ const getCoins = async (req, res) => {
         let rawData = response.data.Data;
         let coinsData = [];
         
+        // rankedCoins.forEach((coin, index) => {
+        //     coin.rank = index + 1;
+        // });
+
 
         // Loop through the data to log CoinInfo and DISPLAY information
         for (let index = 0; index < rawData.length; index++) {
@@ -163,10 +168,17 @@ const getCoins = async (req, res) => {
                 coinDetails.one24h = one24H.toFixed(3);
 
             coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
+            
+            
             coinDetails.MKTCAP = displayData.MKTCAP;
             }
             coinsData.push(coinDetails);
             
+        }
+        if (key) {
+            coinsData = coinsData.filter((coin) =>
+                coin.FullName?.toLowerCase().includes(key.toLowerCase())
+            );
         }
 
         // Respond with success
@@ -176,7 +188,7 @@ const getCoins = async (req, res) => {
             data:coinsData
         });
     } catch (error) {
-        console.error(error);
+        
 
         if (connection) await connection.rollback();
         return error500(error, res);
