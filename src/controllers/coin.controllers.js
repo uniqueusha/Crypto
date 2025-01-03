@@ -29,34 +29,33 @@ const addCoin = async (req, res)=>{
    try {
     connection = await pool.getConnection();
     let response = await axios.get(
-        // `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
-        `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
       );
-    let rawData = response.data.Data;
-    
-    // const responseArray = Object.keys(rawData).map(CoinInfo => ({
-    //     CoinInfo, // include the original key as a field
-    //     ...rawData[CoinInfo] // spread the object data
-    // }));
-    // console.log(responseArray[0].FullName);
-    
+    let rawData = response.data.Data
+          const responseArray = Object.keys(rawData).map(coin => ({
+        coin, // include the original key as a field
+        ...rawData[coin] // spread the object data
+    }));
+
     let emptyImageCount = 0;
     let duplicateCount = 0;
     let insertCount = 0;
-    
-    for (let index = 0; index < rawData.length; index++) {
-        const element = rawData[index].CoinInfo;
-        
+
+    for (let index = 0; index < responseArray.length; index++) {
+        const element = responseArray[index];
+
         let isExistCoinQuery = "SELECT * FROM coins WHERE TRIM(LOWER(ticker_symbol)) = ?";
-        let isExistCoinResult = await connection.query(isExistCoinQuery, [(element.Symbol)]);
-    
+        let isExistCoinResult = await connection.query(isExistCoinQuery, [(element.Symbol).toLowerCase()]);
+
         if (!(isExistCoinResult[0].length > 0)) {
             if (element.ImageUrl) {
                 let coinQuery = "INSERT INTO coins (id, image_url, ticker_symbol, coin_name, short_name) VALUES (?, ?, ?, ?, ?)";
-                let coinValue = [element.Id, element.ImageUrl, element.Internal, element.FullName, element.Name];
+                let coinValue = [element.Id, element.ImageUrl, element.Symbol, element.FullName, element.Symbol];
                 const coinResult = await connection.query(coinQuery, coinValue);
-    
+
                 insertCount++;
+
+                // console.log(element.Symbol);
 
             } else {
                 // console.log("Image empty for symbol:", element.Symbol);
@@ -67,7 +66,9 @@ const addCoin = async (req, res)=>{
             duplicateCount++;
         }
     }
+
     
+
     connection.commit();
     res.status(200).json({
         status:200,
@@ -79,8 +80,6 @@ const addCoin = async (req, res)=>{
         }
     })
    } catch (error) {
-    console.log(error);
-    
     connection.rollback();
     return error500(error, res)
    } finally {
@@ -88,6 +87,70 @@ const addCoin = async (req, res)=>{
 
    }
 };
+// const addCoin = async (req, res)=>{
+//     let connection;
+//    try {
+//     connection = await pool.getConnection();
+//     let response = await axios.get(
+//         // `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+//         `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+//       );
+//     let rawData = response.data.Data;
+    
+//     // const responseArray = Object.keys(rawData).map(CoinInfo => ({
+//     //     CoinInfo, // include the original key as a field
+//     //     ...rawData[CoinInfo] // spread the object data
+//     // }));
+//     // console.log(responseArray[0].FullName);
+    
+//     let emptyImageCount = 0;
+//     let duplicateCount = 0;
+//     let insertCount = 0;
+    
+//     for (let index = 0; index < rawData.length; index++) {
+//         const element = rawData[index].CoinInfo;
+        
+//         let isExistCoinQuery = "SELECT * FROM coins WHERE TRIM(LOWER(ticker_symbol)) = ?";
+//         let isExistCoinResult = await connection.query(isExistCoinQuery, [(element.Symbol)]);
+    
+//         if (!(isExistCoinResult[0].length > 0)) {
+//             if (element.ImageUrl) {
+//                 let coinQuery = "INSERT INTO coins (id, image_url, ticker_symbol, coin_name, short_name) VALUES (?, ?, ?, ?, ?)";
+//                 let coinValue = [element.Id, element.ImageUrl, element.Internal, element.FullName, element.Name];
+//                 const coinResult = await connection.query(coinQuery, coinValue);
+    
+//                 insertCount++;
+
+//             } else {
+//                 // console.log("Image empty for symbol:", element.Symbol);
+//                 emptyImageCount++;
+//             }
+//         } else {
+//             // console.log("Duplicate entry for symbol:", element.Symbol);
+//             duplicateCount++;
+//         }
+//     }
+    
+//     connection.commit();
+//     res.status(200).json({
+//         status:200,
+//         message:"Coin added successfully!",
+//         data: {
+//          "emptyImageCount" :  emptyImageCount,
+//          "duplicateCount" : duplicateCount,
+//          "insertCount" : insertCount
+//         }
+//     })
+//    } catch (error) {
+//     console.log(error);
+    
+//     connection.rollback();
+//     return error500(error, res)
+//    } finally {
+//     connection.release()
+
+//    }
+// };
 
 //get coins list...
 // const getCoins = async(req, res)=>{
@@ -192,9 +255,6 @@ const getCoins = async (req, res) => {
             data:coinsData
         });
     } catch (error) {
-        
-console.log(error);
-
         if (connection) await connection.rollback();
         return error500(error, res);
     } finally {
