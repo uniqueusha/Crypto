@@ -980,6 +980,105 @@ const deleteSetTargetChangeStatus = async (req, res) => {
 //             if (connection) connection.release();
 //         }     
 // };
+// const getSetTargetReached = async (req, res) => {
+//     const untitledId = req.companyData.untitled_id;
+//     const { page, perPage, key } = req.query;
+
+//     let connection = await getConnection();
+//     try {
+//         // Start the transaction
+//         await connection.beginTransaction();
+
+//         // Base queries
+//         let getSetTargetQuery = `
+//             SELECT * FROM sale_target_header 
+//             WHERE untitled_id = ${untitledId} AND status = 1`;
+//         let countQuery = `
+//             SELECT COUNT(*) AS total 
+//             FROM sale_target_header 
+//             WHERE untitled_id = ${untitledId}`;
+
+//         // Add search/filtering if a key is provided
+//         if (key) {
+//             const lowercaseKey = key.toLowerCase().trim();
+//             if (lowercaseKey === "activated") {
+//                 getSetTargetQuery += ` AND status = 1`;
+//                 countQuery += ` AND status = 1`;
+//             } else if (lowercaseKey === "deactivated") {
+//                 getSetTargetQuery += ` AND status = 0`;
+//                 countQuery += ` AND status = 0`;
+//             } else {
+//                 getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+//                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+//             }
+//         }
+
+//         getSetTargetQuery += " ORDER BY sale_date DESC";
+
+//         // Apply pagination if both `page` and `perPage` are provided
+//         let total = 0;
+//         if (page && perPage) {
+//             const totalResult = await connection.query(countQuery);
+//             total = parseInt(totalResult[0][0].total);
+
+//             const start = (page - 1) * perPage;
+//             getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+//         }
+
+//         // Fetch the header data
+//         let result = await connection.query(getSetTargetQuery);
+//         let setTarget = result[0];
+
+//         // Filter headers based on footer data containing `target_id = 2`
+//         let filteredData = [];
+//         for (let i = 0; i < setTarget.length; i++) {
+//             const element = setTarget[i];
+
+//             // Fetch footer data for the current header
+//             let setFooterQuery = `
+//                 SELECT stf.*, ts.target_status, cs.complition_status 
+//                 FROM set_target_footer stf
+//                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+//                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+//                 WHERE stf.sale_target_id = ${element.sale_target_id} 
+//                 AND stf.untitled_id = ${untitledId}
+//                 AND stf.target_id = 2`;
+
+//             const setFooterResult = await connection.query(setFooterQuery);
+
+//             // Include the header only if footer data exists
+//             if (setFooterResult[0].length > 0) {
+//                 element['footer'] = setFooterResult[0].reverse();
+//                 filteredData.push(element);
+//             }
+//         }
+
+//         // Build the response object
+//         const data = {
+//             status: 200,
+//             message: "Set Target retrieved successfully",
+//             data: filteredData,
+//         };
+
+//         // Add pagination information if applicable
+//         if (page && perPage) {
+//             data.pagination = {
+//                 per_page: parseInt(perPage, 10),
+//                 total: total,
+//                 current_page: parseInt(page, 10),
+//                 last_page: Math.ceil(total / perPage),
+//             };
+//         }
+
+//         // Return the response
+//         return res.status(200).json(data);
+//     } catch (error) {
+//         console.error(error);
+//         return error500(error, res);
+//     } finally {
+//         if (connection) connection.release();
+//     }
+// };
 const getSetTargetReached = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
@@ -1029,26 +1128,28 @@ const getSetTargetReached = async (req, res) => {
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
-        // Filter headers based on footer data containing `target_id = 2`
+        // Filter headers based on footer data
         let filteredData = [];
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
 
-            // Fetch footer data for the current header
+            // Fetch all footer data for the current header
             let setFooterQuery = `
                 SELECT stf.*, ts.target_status, cs.complition_status 
                 FROM set_target_footer stf
                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
                 WHERE stf.sale_target_id = ${element.sale_target_id} 
-                AND stf.untitled_id = ${untitledId}
-                AND stf.target_id = 2`;
+                AND stf.untitled_id = ${untitledId}`;
 
             const setFooterResult = await connection.query(setFooterQuery);
 
-            // Include the header only if footer data exists
-            if (setFooterResult[0].length > 0) {
-                element['footer'] = setFooterResult[0].reverse();
+            // Check if at least one footer record has `target_id = 2`
+            const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
+
+            // Include the header only if `target_id = 2` exists, along with all footer data
+            if (hasTargetId2) {
+                element['footer'] = setFooterResult[0].reverse(); // Include all footer data
                 filteredData.push(element);
             }
         }
@@ -1079,6 +1180,7 @@ const getSetTargetReached = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
 
 
 
