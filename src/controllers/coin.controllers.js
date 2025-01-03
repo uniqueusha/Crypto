@@ -135,9 +135,7 @@ const getCoins = async (req, res) => {
         let rawData = response.data.Data;
         let coinsData = [];
         
-        // rankedCoins.forEach((coin, index) => {
-        //     coin.rank = index + 1;
-        // });
+        
 
 
         // Loop through the data to log CoinInfo and DISPLAY information
@@ -151,7 +149,8 @@ const getCoins = async (req, res) => {
             if (coinInfo) {   
                 coinDetails.ImageUrl = coinInfo.ImageUrl; 
                 coinDetails.FullName = coinInfo.FullName;
-                coinDetails.Name = coinInfo.Name 
+                coinDetails.Name = coinInfo.Name;
+                
             }
             
             if (displayData) {
@@ -181,6 +180,11 @@ const getCoins = async (req, res) => {
             );
         }
 
+        // Add rank to the paginated data
+        coinsData.forEach((coin, index) => {
+            coin.Rank = index + 1; // Rank starts at the current page's first item
+        });
+
         // Respond with success
         res.status(200).json({
             status: 200,
@@ -189,6 +193,7 @@ const getCoins = async (req, res) => {
         });
     } catch (error) {
         
+console.log(error);
 
         if (connection) await connection.rollback();
         return error500(error, res);
