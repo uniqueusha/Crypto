@@ -60,7 +60,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-             let final_sale_price = base_price * return_x;
+            //  let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header (coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -86,8 +86,7 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
-                // const target_id = element.target_id ? element.target_id: '';
-                // const complition_id = element.complition_id ? element.complition_id: '';
+                
                 const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
                 
                 const targetValue = (available_coins / 100) * sale_target_coin;
@@ -146,8 +145,6 @@ const createCurrentPrice = async (req, res) => {
             }
         });
     }catch (error) {
-        console.log(error);
-        
         return error500(error, res);
     } finally {
         if (connection) connection.release();
@@ -757,7 +754,7 @@ const updateSetTarget = async (req, res) => {
     try {
         // Start a transaction
         await connection.beginTransaction();
-        let final_sale_price = base_price * return_x;
+        // let final_sale_price = base_price * return_x;
 
         // Update Task Heater
         const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET coin = ?,base_price = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
@@ -906,6 +903,85 @@ const deleteSetTargetChangeStatus = async (req, res) => {
     }
 };
 
+//set target reached list
+const getSetTargetReached = async (req, res) => {
+    
+        const untitledId = req.companyData.untitled_id;
+        const { page, perPage, key } = req.query;
+        // Attempt to obtain a database connection
+        let connection = await getConnection();
+        try {
+            //Start the transaction
+            await connection.beginTransaction();
+    
+            let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+            let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
+    
+            if (key) {
+                const lowercaseKey = key.toLowerCase().trim();
+                if (lowercaseKey === "activated") {
+                    getSetTargetQuery += ` AND status = 1`;
+                    countQuery += ` AND status = 1`;
+                } else if (lowercaseKey === "deactivated") {
+                    getSetTargetQuery += ` AND status = 0`;
+                    countQuery += ` AND status = 0`;
+                } else {
+                    getSetTargetQuery += ` AND  LOWER(coin) LIKE '%${lowercaseKey}%' `;
+                    countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%' `;
+                }
+            }
+            getSetTargetQuery += " ORDER BY sale_date DESC";
+            // Apply pagination if both page and perPage are provided
+            let total = 0;
+            if (page && perPage) {
+                const totalResult = await connection.query(countQuery);
+                total = parseInt(totalResult[0][0].total);
+    
+                const start = (page - 1) * perPage;
+                getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+            }
+            let result = await connection.query(getSetTargetQuery);
+            let setTarget = result[0];
+     
+            //get set_header_footer
+            for (let i = 0; i < setTarget.length; i++) {
+                const element = setTarget[i];
+                
+                let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+                LEFT JOIN target_status ts
+                ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs
+                ON cs.complition_id = stf.complition_id 
+                WHERE stf.sale_target_id = ${element.sale_target_id} AND
+                stf.untitled_id = ${untitledId}
+                AND stf.target_id = 2`;
+                setFooterResult = await connection.query(setFooterQuery);
+                setTarget[i]['footer']= setFooterResult[0].reverse();
+            }
+    
+            const data = {
+                status: 200,
+                message: "Set Target retrieved successfully",
+                data: setTarget,
+            };
+            // Add pagination information if provided
+            if (page && perPage) {
+                data.pagination = {
+                    per_page: perPage,
+                    total: total,
+                    current_page: page,
+                    last_page: Math.ceil(total / perPage),
+                };
+            }
+            return res.status(200).json(data);
+        } catch (error) {
+            return error500(error, res);
+        } finally {
+            if (connection) connection.release();
+        }     
+};
+
+
 module.exports = {
     addSaleTargetHeader,
     currantPriceUpdateTargetComplitionStatus,
@@ -916,5 +992,6 @@ module.exports = {
     getSetTargetCount,
     updateSetTarget,
     getSetTarget,
-    deleteSetTargetChangeStatus
+    deleteSetTargetChangeStatus,
+    getSetTargetReached
 }
