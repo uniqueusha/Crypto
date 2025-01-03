@@ -10,6 +10,7 @@ router.get('/', checkAuth, saleTargetHeaderController.getSetTargets);
 router.get('/set-target-count', checkAuth, saleTargetHeaderController.getSetTargetCount);
 router.get('/download-set-target', checkAuth, saleTargetHeaderController.getSetTargetDownload);
 router.get('/reached', checkAuth, saleTargetHeaderController.getSetTargetReached);
+router.get('/sold-coin', checkAuth, saleTargetHeaderController.getSoldCoin);
 router.get('/:id', checkAuth, saleTargetHeaderController.getSetTarget);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
 router.put('/:id', checkAuth, saleTargetHeaderController.updateSetTarget);
