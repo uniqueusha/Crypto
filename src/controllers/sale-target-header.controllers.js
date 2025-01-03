@@ -904,82 +904,182 @@ const deleteSetTargetChangeStatus = async (req, res) => {
 };
 
 //set target reached list
-const getSetTargetReached = async (req, res) => {
+// const getSetTargetReached = async (req, res) => {
     
-        const untitledId = req.companyData.untitled_id;
-        const { page, perPage, key } = req.query;
-        // Attempt to obtain a database connection
-        let connection = await getConnection();
-        try {
-            //Start the transaction
-            await connection.beginTransaction();
+//         const untitledId = req.companyData.untitled_id;
+//         const { page, perPage, key } = req.query;
+//         // Attempt to obtain a database connection
+//         let connection = await getConnection();
+//         try {
+//             //Start the transaction
+//             await connection.beginTransaction();
     
-            let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-            let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
+//             let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+//             let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
     
-            if (key) {
-                const lowercaseKey = key.toLowerCase().trim();
-                if (lowercaseKey === "activated") {
-                    getSetTargetQuery += ` AND status = 1`;
-                    countQuery += ` AND status = 1`;
-                } else if (lowercaseKey === "deactivated") {
-                    getSetTargetQuery += ` AND status = 0`;
-                    countQuery += ` AND status = 0`;
-                } else {
-                    getSetTargetQuery += ` AND  LOWER(coin) LIKE '%${lowercaseKey}%' `;
-                    countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%' `;
-                }
-            }
-            getSetTargetQuery += " ORDER BY sale_date DESC";
-            // Apply pagination if both page and perPage are provided
-            let total = 0;
-            if (page && perPage) {
-                const totalResult = await connection.query(countQuery);
-                total = parseInt(totalResult[0][0].total);
+//             if (key) {
+//                 const lowercaseKey = key.toLowerCase().trim();
+//                 if (lowercaseKey === "activated") {
+//                     getSetTargetQuery += ` AND status = 1`;
+//                     countQuery += ` AND status = 1`;
+//                 } else if (lowercaseKey === "deactivated") {
+//                     getSetTargetQuery += ` AND status = 0`;
+//                     countQuery += ` AND status = 0`;
+//                 } else {
+//                     getSetTargetQuery += ` AND  LOWER(coin) LIKE '%${lowercaseKey}%' `;
+//                     countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%' `;
+//                 }
+//             }
+//             getSetTargetQuery += " ORDER BY sale_date DESC";
+//             // Apply pagination if both page and perPage are provided
+//             let total = 0;
+//             if (page && perPage) {
+//                 const totalResult = await connection.query(countQuery);
+//                 total = parseInt(totalResult[0][0].total);
     
-                const start = (page - 1) * perPage;
-                getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
-            }
-            let result = await connection.query(getSetTargetQuery);
-            let setTarget = result[0];
+//                 const start = (page - 1) * perPage;
+//                 getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+//             }
+//             let result = await connection.query(getSetTargetQuery);
+//             let setTarget = result[0];
      
-            //get set_header_footer
-            for (let i = 0; i < setTarget.length; i++) {
-                const element = setTarget[i];
+//             //get set_header_footer
+//             for (let i = 0; i < setTarget.length; i++) {
+//                 const element = setTarget[i];
                 
-                let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-                LEFT JOIN target_status ts
-                ON ts.target_id = stf.target_id
-                LEFT JOIN complition_status cs
-                ON cs.complition_id = stf.complition_id 
-                WHERE stf.sale_target_id = ${element.sale_target_id} AND
-                stf.untitled_id = ${untitledId}
-                AND stf.target_id = 2`;
-                setFooterResult = await connection.query(setFooterQuery);
-                setTarget[i]['footer']= setFooterResult[0].reverse();
-            }
+//                 let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
+//                 LEFT JOIN target_status ts
+//                 ON ts.target_id = stf.target_id
+//                 LEFT JOIN complition_status cs
+//                 ON cs.complition_id = stf.complition_id 
+//                 WHERE stf.sale_target_id = ${element.sale_target_id} AND
+//                 stf.untitled_id = ${untitledId}
+//                 AND stf.target_id = 2`;
+//                 setFooterResult = await connection.query(setFooterQuery);
+//                 setTarget[i]['footer']= setFooterResult[0].reverse();
+//             }
     
-            const data = {
-                status: 200,
-                message: "Set Target retrieved successfully",
-                data: setTarget,
-            };
-            // Add pagination information if provided
-            if (page && perPage) {
-                data.pagination = {
-                    per_page: perPage,
-                    total: total,
-                    current_page: page,
-                    last_page: Math.ceil(total / perPage),
-                };
+//             const data = {
+//                 status: 200,
+//                 message: "Set Target retrieved successfully",
+//                 data: setTarget,
+//             };
+//             // Add pagination information if provided
+//             if (page && perPage) {
+//                 data.pagination = {
+//                     per_page: perPage,
+//                     total: total,
+//                     current_page: page,
+//                     last_page: Math.ceil(total / perPage),
+//                 };
+//             }
+//             return res.status(200).json(data);
+//         } catch (error) {
+//             return error500(error, res);
+//         } finally {
+//             if (connection) connection.release();
+//         }     
+// };
+const getSetTargetReached = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    const { page, perPage, key } = req.query;
+
+    let connection = await getConnection();
+    try {
+        // Start the transaction
+        await connection.beginTransaction();
+
+        // Base queries
+        let getSetTargetQuery = `
+            SELECT * FROM sale_target_header 
+            WHERE untitled_id = ${untitledId} AND status = 1`;
+        let countQuery = `
+            SELECT COUNT(*) AS total 
+            FROM sale_target_header 
+            WHERE untitled_id = ${untitledId}`;
+
+        // Add search/filtering if a key is provided
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSetTargetQuery += ` AND status = 1`;
+                countQuery += ` AND status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSetTargetQuery += ` AND status = 0`;
+                countQuery += ` AND status = 0`;
+            } else {
+                getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+                countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
             }
-            return res.status(200).json(data);
-        } catch (error) {
-            return error500(error, res);
-        } finally {
-            if (connection) connection.release();
-        }     
+        }
+
+        getSetTargetQuery += " ORDER BY sale_date DESC";
+
+        // Apply pagination if both `page` and `perPage` are provided
+        let total = 0;
+        if (page && perPage) {
+            const totalResult = await connection.query(countQuery);
+            total = parseInt(totalResult[0][0].total);
+
+            const start = (page - 1) * perPage;
+            getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+        }
+
+        // Fetch the header data
+        let result = await connection.query(getSetTargetQuery);
+        let setTarget = result[0];
+
+        // Filter headers based on footer data containing `target_id = 2`
+        let filteredData = [];
+        for (let i = 0; i < setTarget.length; i++) {
+            const element = setTarget[i];
+
+            // Fetch footer data for the current header
+            let setFooterQuery = `
+                SELECT stf.*, ts.target_status, cs.complition_status 
+                FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+                WHERE stf.sale_target_id = ${element.sale_target_id} 
+                AND stf.untitled_id = ${untitledId}
+                AND stf.target_id = 2`;
+
+            const setFooterResult = await connection.query(setFooterQuery);
+
+            // Include the header only if footer data exists
+            if (setFooterResult[0].length > 0) {
+                element['footer'] = setFooterResult[0].reverse();
+                filteredData.push(element);
+            }
+        }
+
+        // Build the response object
+        const data = {
+            status: 200,
+            message: "Set Target retrieved successfully",
+            data: filteredData,
+        };
+
+        // Add pagination information if applicable
+        if (page && perPage) {
+            data.pagination = {
+                per_page: parseInt(perPage, 10),
+                total: total,
+                current_page: parseInt(page, 10),
+                last_page: Math.ceil(total / perPage),
+            };
+        }
+
+        // Return the response
+        return res.status(200).json(data);
+    } catch (error) {
+        console.error(error);
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
 };
+
 
 
 module.exports = {
