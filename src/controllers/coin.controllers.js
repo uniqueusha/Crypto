@@ -376,8 +376,8 @@ const getCoinWma = async (req, res) => {
             const lowercaseKey = key.toLowerCase().trim();
             coinQuery += ` AND LOWER(coin_name) LIKE '%${lowercaseKey}%'`;  
         }
+        coinQuery += ` ORDER BY coin_name ASC`;
         coinQuery += ` limit 200`;
-        coinQuery += `ORDER BY coin ASC`
         const coinResult = await connection.query(coinQuery);
         const coin = coinResult[0];
 
