@@ -427,7 +427,7 @@ const updateSellSold = async (req, res) => {
                 const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
                 const set_footer_id = req.body.set_footer_id ? parseFloat(req.body.set_footer_id) : '';
                 const coin = req.body.coin ? req.body.coin : '';
-                const base_price = req.body.base_price ? req.body.base_price : '';
+                const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
 
 
                 // Check if completion ID is 3
@@ -680,7 +680,7 @@ const deleteSetTargetChangeStatus = async (req, res) => {
               WHERE sale_target_id = ? AND untitled_id = ?`;
         await connection.query(updatefooterQuery, [status, sale_target_id, untitledId]);
     
-        const statusMessage = status === 1 ? "activated" : "Delete";
+        const statusMessage = status === 1 ? "activated" : "Deleted";
         //commit the transation
         await connection.commit();
         return res.status(200).json({
@@ -696,106 +696,6 @@ const deleteSetTargetChangeStatus = async (req, res) => {
 
 //set target reached list
 
-// const getSetTargetReached = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-//     const { page, perPage, key } = req.query;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         // Base queries
-//         let getSetTargetQuery = `
-//             SELECT * FROM sale_target_header 
-//             WHERE untitled_id = ${untitledId} AND status = 1`;
-//         let countQuery = `
-//             SELECT COUNT(*) AS total 
-//             FROM sale_target_header 
-//             WHERE untitled_id = ${untitledId}`;
-
-//         // Add search/filtering if a key is provided
-//         if (key) {
-//             const lowercaseKey = key.toLowerCase().trim();
-//             if (lowercaseKey === "activated") {
-//                 getSetTargetQuery += ` AND status = 1`;
-//                 countQuery += ` AND status = 1`;
-//             } else if (lowercaseKey === "deactivated") {
-//                 getSetTargetQuery += ` AND status = 0`;
-//                 countQuery += ` AND status = 0`;
-//             } else {
-//                 getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-//                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-//             }
-//         }
-
-//         getSetTargetQuery += " ORDER BY sale_date DESC";
-
-//         // Apply pagination if both `page` and `perPage` are provided
-//         let total = 0;
-//         if (page && perPage) {
-//             const totalResult = await connection.query(countQuery);
-//             total = parseInt(totalResult[0][0].total);
-
-//             const start = (page - 1) * perPage;
-//             getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
-//         }
-
-//         // Fetch the header data
-//         let result = await connection.query(getSetTargetQuery);
-//         let setTarget = result[0];
-
-//         // Filter headers based on footer data
-//         let filteredData = [];
-//         for (let i = 0; i < setTarget.length; i++) {
-//             const element = setTarget[i];
-
-//             // Fetch all footer data for the current header
-//             let setFooterQuery = `
-//                 SELECT stf.*, ts.target_status, cs.complition_status 
-//                 FROM set_target_footer stf
-//                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-//                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
-//                 WHERE stf.sale_target_id = ${element.sale_target_id} 
-//                 AND stf.untitled_id = ${untitledId}`;
-
-//             const setFooterResult = await connection.query(setFooterQuery);
-
-//             // Check if at least one footer record has `target_id = 2`
-//             const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
-
-//             // Include the header only if `target_id = 2` exists, along with all footer data
-//             if (hasTargetId2) {
-//                 element['footer'] = setFooterResult[0].reverse(); // Include all footer data
-//                 filteredData.push(element);
-//             }
-//         }
-
-//         // Build the response object
-//         const data = {
-//             status: 200,
-//             message: "Set Target retrieved successfully",
-//             data: filteredData,
-//         };
-
-//         // Add pagination information if applicable
-//         if (page && perPage) {
-//             data.pagination = {
-//                 per_page: parseInt(perPage, 10),
-//                 total: total,
-//                 current_page: parseInt(page, 10),
-//                 last_page: Math.ceil(total / perPage),
-//             };
-//         }
-
-//         // Return the response
-//         return res.status(200).json(data);
-//     } catch (error) {
-//         return error500(error, res);
-//     } finally {
-//         if (connection) connection.release();
-//     }
-// };
 const getSetTargetReached = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
@@ -850,26 +750,23 @@ const getSetTargetReached = async (req, res) => {
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
 
-            // Fetch all footer data for the current header, excluding complition_id = 4
+            // Fetch all footer data for the current header
             let setFooterQuery = `
                 SELECT stf.*, ts.target_status, cs.complition_status 
                 FROM set_target_footer stf
                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
                 WHERE stf.sale_target_id = ${element.sale_target_id} 
-                AND stf.untitled_id = ${untitledId}
-                AND stf.complition_id != 4`; // Exclude records with complition_id = 4
+                AND stf.untitled_id = ${untitledId}`;
 
             const setFooterResult = await connection.query(setFooterQuery);
 
-            // Only include the header if there is valid footer data (i.e., excluding complition_id = 4)
-            if (setFooterResult[0] && setFooterResult[0].length > 0) {
-                // Include footer data that doesn't have complition_id = 4
+            // Check if at least one footer record has `target_id = 2`
+            const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
+
+            // Include the header only if `target_id = 2` exists, along with all footer data
+            if (hasTargetId2) {
                 element['footer'] = setFooterResult[0].reverse(); // Include all footer data
-                filteredData.push(element);
-            } else {
-                // If no matching footer is found, include the header with an empty footer array
-                element['footer'] = [];
                 filteredData.push(element);
             }
         }
@@ -899,6 +796,109 @@ const getSetTargetReached = async (req, res) => {
         if (connection) connection.release();
     }
 };
+// const getSetTargetReached = async (req, res) => {
+//     const untitledId = req.companyData.untitled_id;
+//     const { page, perPage, key } = req.query;
+
+//     let connection = await getConnection();
+//     try {
+//         // Start the transaction
+//         await connection.beginTransaction();
+
+//         // Base queries
+//         let getSetTargetQuery = `
+//             SELECT * FROM sale_target_header 
+//             WHERE untitled_id = ${untitledId} AND status = 1`;
+//         let countQuery = `
+//             SELECT COUNT(*) AS total 
+//             FROM sale_target_header 
+//             WHERE untitled_id = ${untitledId}`;
+
+//         // Add search/filtering if a key is provided
+//         if (key) {
+//             const lowercaseKey = key.toLowerCase().trim();
+//             if (lowercaseKey === "activated") {
+//                 getSetTargetQuery += ` AND status = 1`;
+//                 countQuery += ` AND status = 1`;
+//             } else if (lowercaseKey === "deactivated") {
+//                 getSetTargetQuery += ` AND status = 0`;
+//                 countQuery += ` AND status = 0`;
+//             } else {
+//                 getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+//                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+//             }
+//         }
+
+//         getSetTargetQuery += " ORDER BY sale_date DESC";
+
+//         // Apply pagination if both `page` and `perPage` are provided
+//         let total = 0;
+//         if (page && perPage) {
+//             const totalResult = await connection.query(countQuery);
+//             total = parseInt(totalResult[0][0].total);
+
+//             const start = (page - 1) * perPage;
+//             getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+//         }
+
+//         // Fetch the header data
+//         let result = await connection.query(getSetTargetQuery);
+//         let setTarget = result[0];
+
+//         // Filter headers based on footer data
+//         let filteredData = [];
+//         for (let i = 0; i < setTarget.length; i++) {
+//             const element = setTarget[i];
+
+//             // Fetch all footer data for the current header, excluding complition_id = 4
+//             let setFooterQuery = `
+//                 SELECT stf.*, ts.target_status, cs.complition_status 
+//                 FROM set_target_footer stf
+//                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+//                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+//                 WHERE stf.sale_target_id = ${element.sale_target_id} 
+//                 AND stf.untitled_id = ${untitledId}
+//                 AND stf.complition_id != 4`; // Exclude records with complition_id = 4
+
+//             const setFooterResult = await connection.query(setFooterQuery);
+
+//             // Only include the header if there is valid footer data (i.e., excluding complition_id = 4)
+//             if (setFooterResult[0] && setFooterResult[0].length > 0) {
+//                 // Include footer data that doesn't have complition_id = 4
+//                 element['footer'] = setFooterResult[0].reverse(); // Include all footer data
+//                 filteredData.push(element);
+//             } else {
+//                 // If no matching footer is found, include the header with an empty footer array
+//                 element['footer'] = [];
+//                 filteredData.push(element);
+//             }
+//         }
+
+//         // Build the response object
+//         const data = {
+//             status: 200,
+//             message: "Set Target retrieved successfully",
+//             data: filteredData,
+//         };
+
+//         // Add pagination information if applicable
+//         if (page && perPage) {
+//             data.pagination = {
+//                 per_page: parseInt(perPage, 10),
+//                 total: total,
+//                 current_page: parseInt(page, 10),
+//                 last_page: Math.ceil(total / perPage),
+//             };
+//         }
+
+//         // Return the response
+//         return res.status(200).json(data);
+//     } catch (error) {
+//         return error500(error, res);
+//     } finally {
+//         if (connection) connection.release();
+//     }
+// };
 
 
 //Get Sold Coin
