@@ -288,6 +288,7 @@ const getUsers = async (req, res) => {
                 countQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%' `;
             }
         }
+        getUserQuery += " ORDER BY cts DESC";
        
         // Apply pagination if both page and perPage are provided
         let total = 0;
