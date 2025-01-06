@@ -198,9 +198,6 @@ const getCoins = async (req, res) => {
         let rawData = response.data.Data;
         let coinsData = [];
         
-        
-
-
         // Loop through the data to log CoinInfo and DISPLAY information
         for (let index = 0; index < rawData.length; index++) {
             const coinInfo = rawData[index].CoinInfo;
@@ -213,7 +210,6 @@ const getCoins = async (req, res) => {
                 coinDetails.ImageUrl = coinInfo.ImageUrl; 
                 coinDetails.FullName = coinInfo.FullName;
                 coinDetails.Name = coinInfo.Name;
-                
             }
             
             if (displayData) {
@@ -230,12 +226,9 @@ const getCoins = async (req, res) => {
                 coinDetails.one24h = one24H.toFixed(3);
 
             coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
-            
-            
             coinDetails.MKTCAP = displayData.MKTCAP;
             }
-            coinsData.push(coinDetails);
-            
+            coinsData.push(coinDetails);  
         }
         if (key) {
             coinsData = coinsData.filter((coin) =>
@@ -374,9 +367,9 @@ const getCoinWma = async (req, res) => {
         WHERE status = 1`;
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
-            coinQuery += ` AND LOWER(coin_name) LIKE '%${lowercaseKey}%'`;  
+            coinQuery += ` AND LOWER(short_name) LIKE '%${lowercaseKey}%'`;  
         }
-        coinQuery += ` ORDER BY coin_name ASC`;
+        coinQuery += ` ORDER BY short_name ASC`;
         coinQuery += ` limit 200`;
         const coinResult = await connection.query(coinQuery);
         const coin = coinResult[0];
