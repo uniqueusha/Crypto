@@ -31,7 +31,7 @@ error500 = (error, res) => {
 
 //Add Set target
 const addSaleTargetHeader = async (req, res) => {
-    const tricker = req.body.tricker ? req.body.tricker: '';
+    const ticker = req.body.ticker ? req.body.ticker: '';
         const coin = req.body.coin ? req.body.coin: '';
         const base_price = req.body.base_price ? req.body.base_price: '';
         const currant_price = req.body.currant_price ? req.body.currant_price: '';
@@ -63,8 +63,8 @@ const addSaleTargetHeader = async (req, res) => {
             await connection.beginTransaction();
             // let final_sale_price = base_price * return_x;
 
-            const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header ( tricker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-            const insertSaleTargetHeaderValue = [tricker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
+            const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header ( ticker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            const insertSaleTargetHeaderValue = [ticker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
             const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery,insertSaleTargetHeaderValue);
             const sale_target_id = insertSaleTargetHeaderResult[0].insertId
             
@@ -517,7 +517,7 @@ const getSetTargetCount = async (req, res) => {
 //Update Set Target
 const updateSetTarget = async (req, res) => {
     const sale_target_id = parseInt(req.params.id);
-    const tricker = req.body.tricker ? req.body.tricker: '';
+    const ticker = req.body.ticker ? req.body.ticker: '';
     const coin = req.body.coin ? req.body.coin: '';
     const base_price = req.body.base_price ? req.body.base_price: '';
     const currant_price = req.body.currant_price ? req.body.currant_price: '';
@@ -550,8 +550,8 @@ const updateSetTarget = async (req, res) => {
         // let final_sale_price = base_price * return_x;
 
         // Update Task Heater
-        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET tricker = ?, coin = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatesaleTargetHeaderQuery, [tricker, coin, currant_price, return_x, final_sale_price, available_coins, sale_target_id, untitled_id]);
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, return_x, final_sale_price, available_coins, sale_target_id, untitled_id]);
         
         //update into sale target header
         let setTargetFooterArray = setTargetFooter.reverse();
