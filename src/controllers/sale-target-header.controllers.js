@@ -61,7 +61,7 @@ const addSaleTargetHeader = async (req, res) => {
             
             //Start the transaction
             await connection.beginTransaction();
-            let final_sale_price = base_price * return_x;
+            // let final_sale_price = base_price * return_x;
 
             const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header ( ticker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             const insertSaleTargetHeaderValue = [ticker, coin, base_price, currant_price, return_x, final_sale_price, available_coins, untitled_id];
@@ -87,7 +87,7 @@ const addSaleTargetHeader = async (req, res) => {
                 }
                 
                 const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
-                const sale_target_value  = element.sale_target_value  ? element.sale_target_value : '';
+                const sale_target_value  = element.sale_target_value  ? element.sale_target_value : '0';
 
                 const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
                 
@@ -571,14 +571,16 @@ const updateSetTarget = async (req, res) => {
             }
             
             const set_footer_id = element.set_footer_id ? element.set_footer_id : '';
-
+         
             const sale_target_coin  = element.sale_target_coin  ? element.sale_target_coin : '';
+            const sale_target_value  = element.sale_target_value  ? element.sale_target_value : '0';
+
             // const sale_target_percent = element.sale_target_percent ? element.sale_target_percent: '';
             
-            const targetValue = (available_coins / 100) * sale_target_coin;
+            const targetValue = (available_coins / 100) * sale_target_value;
 
-            let updateSetTargetFooterQuery = `UPDATE set_target_footer SET sale_target_id = ?, sale_target_coin = ?, sale_target = ? WHERE sale_target_id = ? AND set_footer_id = ? AND untitled_id = ?`;
-            let updateSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_id, set_footer_id, untitled_id];
+            let updateSetTargetFooterQuery = `UPDATE set_target_footer SET sale_target_id = ?, sale_target_coin = ?, sale_target = ?, sale_target_value = ? WHERE sale_target_id = ? AND set_footer_id = ? AND untitled_id = ?`;
+            let updateSetTargetFootervalues = [sale_target_id, targetValue, sale_target, sale_target_value, sale_target_id, set_footer_id, untitled_id];
             let updateSetTargetFooterResult = await connection.query(updateSetTargetFooterQuery, updateSetTargetFootervalues);
         }
         // Commit the transaction
