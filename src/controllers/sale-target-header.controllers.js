@@ -112,10 +112,11 @@ const addSaleTargetHeader = async (req, res) => {
 };
 
 //create current price
+//create current price
 const createCurrentPrice = async (req, res) => {
-    const tricker = req.body.tricker ? req.body.tricker: '';
-    if (!tricker) {
-        return error422("Tricker Symbol is required.", res);
+    const ticker = req.body.ticker ? req.body.ticker: '';
+    if (!ticker) {
+        return error422("Ticker  is required.", res);
     }   
     let connection = await getConnection();
     try {
@@ -123,19 +124,20 @@ const createCurrentPrice = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
         // let final_sale_price = base_price * return_x;
-        if (!tricker) {
-            const insertTrickerQuery = `INSERT INTO api_settings ( tricker ) VALUES (?)`;
-            const insertTrickerResult = await connection.query(insertTrickerQuery, [tricker]);  
+        if (!ticker) {
+            const insertTickerQuery = `INSERT INTO api_settings ( ticker ) VALUES (?)`;
+            const insertTickerResult = await connection.query(insertTickerQuery, [tricker]);  
         } else {
-            const updateTrickerQuery = `UPDATE api_settings SET tricker = ? WHERE id = 1`;
-            const updateTrickerResult = await connection.query(updateTrickerQuery, [tricker]);
+            const updateTickerQuery = `UPDATE api_settings SET ticker = ? WHERE id = 1`;
+            const updateTickerResult = await connection.query(updateTickerQuery, [ticker]);
         }
-        const query = 'SELECT url, tricker, currency_name FROM api_settings';
+        const query = 'SELECT url, ticker, currency_name, api_key FROM api_settings';
         const result = await connection.query(query);
         // Loop through the results and concatenate the fields
-        const fullUrls = result[0].map(row => `${row.url}${row.tricker}${row.currency_name}`);
+        const fullUrls = result[0].map(row => `${row.url}${row.ticker}${row.currency_name}${row.api_key}`);
         const currentPriceUrl = await axios.get(fullUrls);
-        const price = currentPriceUrl.data.USD;
+        const cryptoSymbol = ticker;
+        const price = currentPriceUrl.data[cryptoSymbol].USD;
         
         //commit the transation
         await connection.commit();
