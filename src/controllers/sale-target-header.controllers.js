@@ -112,7 +112,6 @@ const addSaleTargetHeader = async (req, res) => {
 };
 
 //create current price
-//create current price
 const createCurrentPrice = async (req, res) => {
     const ticker = req.body.ticker ? req.body.ticker: '';
     if (!ticker) {

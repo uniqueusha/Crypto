@@ -28,13 +28,13 @@ error500 = (error, res) => {
 
 //add current_price
 const addCurrentPrice = async (req, res) => {
+  const untitled_id = req.companyData.untitled_id;
     let connection;
-  
     try {
       connection = await getConnection();
 
       await connection.beginTransaction();
-      const isExistTickerQuery = `SELECT ticker FROM sale_target_header`;
+      const isExistTickerQuery = `SELECT ticker FROM sale_target_header WHERE untitled_id = ${untitled_id}`;
       const isExistTickerResult = await connection.query(isExistTickerQuery);
   
       const tickers = isExistTickerResult[0]
@@ -57,16 +57,16 @@ const addCurrentPrice = async (req, res) => {
       for (const cryptoSymbol of tickerArray) {
         const price = currentPriceData[cryptoSymbol]?.USD; 
         if (price) {
-          const checkExistsQuery = `SELECT COUNT(*) AS count FROM current_price WHERE ticker = ?`;
+          const checkExistsQuery = `SELECT COUNT(*) AS count FROM current_price WHERE ticker = ? AND untitled_id = ${untitled_id}`;
           const [checkExistsResult] = await connection.query(checkExistsQuery, [cryptoSymbol]);
   
           if (checkExistsResult[0].count > 0) {
-            const updateQuery = `UPDATE current_price SET current_price = ? WHERE ticker = ?`;
+            const updateQuery = `UPDATE current_price SET current_price = ? WHERE ticker = ? AND untitled_id = ${untitled_id}`;
             await connection.query(updateQuery, [price, cryptoSymbol]);
            
           } else {
-            const insertQuery = `INSERT INTO current_price (ticker, current_price) VALUES (?, ?)`;
-            await connection.query(insertQuery, [cryptoSymbol, price]);
+            const insertQuery = `INSERT INTO current_price (ticker, current_price, untitled_id ) VALUES (?, ?, ?)`;
+            await connection.query(insertQuery, [cryptoSymbol, price, untitled_id]);
           }
         } else {
           console.warn(`No price found for ${cryptoSymbol}`);
@@ -74,27 +74,49 @@ const addCurrentPrice = async (req, res) => {
       }
 
       await connection.commit();
-  
       res.status(200).json({
         status: 200,
         message: `Current prices added/updated successfully.`,
       });
     } catch (error) {
-      console.error("Error:", error.message);
-  
       if (connection) await connection.rollback();
-      return res.status(500).json({
-        status: 500,
-        message: "An error occurred while adding current prices.",
-        error: error.message,
-      });
+      return error500(error, res);
     } finally {
       if (connection) connection.release();
     }
-  };
+};
+
+//current price list
+const getCurrentprice = async (req, res) => {
+  const untitledId = req.companyData.untitled_id;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        //Start the transaction
+        await connection.beginTransaction();
+
+        let getCurrentpriceQuery = `SELECT * FROM current_price WHERE untitled_id = ${untitledId}`;
+        
+        const result = await connection.query(getCurrentpriceQuery);
+        const currentPrice = result[0];
+
+        const data = {
+            status: 200,
+            message: "Current Price retrieved successfully",
+            data: currentPrice,
+        };
   
+        return res.status(200).json(data);
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
+};
   
+
 
 module.exports = {
   addCurrentPrice,
+  getCurrentprice
 };
