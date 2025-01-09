@@ -28,74 +28,100 @@ error500 = (error, res) => {
 
 //add current_price
 const addCurrentPrice = async (req, res) => {
-  const untitled_id = req.companyData.untitled_id;
-    let connection;
-    try {
+  let connection;
+  try {
       connection = await getConnection();
 
       await connection.beginTransaction();
-      const isExistTickerQuery = `SELECT ticker FROM sale_target_header WHERE untitled_id = ${untitled_id}`;
+      
+      // Fetching tickers and their corresponding sale_target_id where status = 1
+      const isExistTickerQuery = `SELECT sale_target_id, ticker FROM sale_target_header WHERE status = 1`;
       const isExistTickerResult = await connection.query(isExistTickerQuery);
-  
-      const tickers = isExistTickerResult[0]
-        .map((element) => element.ticker)
-        .join(",");
-  
-      if (!tickers) {
-        throw new Error("No tickers found in the database.");
+
+      if (!isExistTickerResult[0].length) {
+          throw new Error("No tickers found with status = 1 in the database.");
       }
+
+      // Preparing the list of tickers and associated sale_target_id for the API call
+      const tickers = isExistTickerResult[0]
+          .map((element) => element.ticker)
+          .join(",");
+      
+      const saleTargetIds = isExistTickerResult[0];
+
       const query = "SELECT url, ticker, currency_name, api_key FROM api_settings";
       const result = await connection.query(query);
 
+      // Constructing URLs for each API call
       const fullUrls = result[0].map(
-        (row) => `${row.url}${tickers}${row.currency_name}${row.api_key}`
+          (row) => `${row.url}${tickers}${row.currency_name}${row.api_key}`
       );
-      const currentPriceResponse = await axios.get(fullUrls[0]); 
+
+      // Making the API request to get the current prices
+      const currentPriceResponse = await axios.get(fullUrls[0]);
       const currentPriceData = currentPriceResponse.data;
+
       const tickerArray = tickers.split(",");
 
+      // Loop through each ticker and update/insert its price into the current_price table
       for (const cryptoSymbol of tickerArray) {
-        const price = currentPriceData[cryptoSymbol]?.USD; 
-        if (price) {
-          const checkExistsQuery = `SELECT COUNT(*) AS count FROM current_price WHERE ticker = ? AND untitled_id = ${untitled_id}`;
-          const [checkExistsResult] = await connection.query(checkExistsQuery, [cryptoSymbol]);
-  
-          if (checkExistsResult[0].count > 0) {
-            const updateQuery = `UPDATE current_price SET current_price = ? WHERE ticker = ? AND untitled_id = ${untitled_id}`;
-            await connection.query(updateQuery, [price, cryptoSymbol]);
-           
+          const price = currentPriceData[cryptoSymbol]?.USD; 
+
+          if (price) {
+              const checkExistsQuery = `SELECT COUNT(*) AS count FROM current_price WHERE ticker = ?`;
+              const [checkExistsResult] = await connection.query(checkExistsQuery, [cryptoSymbol]);
+
+              // Find corresponding sale_target_id for the ticker
+              const sale_target_id = saleTargetIds.find(
+                  (element) => element.ticker === cryptoSymbol
+              )?.sale_target_id;
+
+              if (!sale_target_id) {
+                  console.warn(`No sale_target_id found for ${cryptoSymbol}`);
+                  continue;
+              }
+
+              if (checkExistsResult[0].count > 0) {
+                  // Update the price if the ticker already exists
+                  const updateQuery = `UPDATE current_price SET current_price = ? WHERE ticker = ?`;
+                  await connection.query(updateQuery, [price, cryptoSymbol]);
+              } else {
+                  // Insert a new record if the ticker does not exist
+                  const insertQuery = `INSERT INTO current_price (ticker, current_price, sale_target_id) VALUES (?, ?, ?)`;
+                  await connection.query(insertQuery, [cryptoSymbol, price, sale_target_id]);
+              }
           } else {
-            const insertQuery = `INSERT INTO current_price (ticker, current_price, untitled_id ) VALUES (?, ?, ?)`;
-            await connection.query(insertQuery, [cryptoSymbol, price, untitled_id]);
+              console.warn(`No price found for ${cryptoSymbol}`);
           }
-        } else {
-          console.warn(`No price found for ${cryptoSymbol}`);
-        }
       }
 
+      // Commit the transaction
       await connection.commit();
+
+      // Respond with success message
       res.status(200).json({
-        status: 200,
-        message: `Current prices added/updated successfully.`,
+          status: 200,
+          message: `Current prices added/updated successfully.`,
       });
-    } catch (error) {
+  } catch (error) {
       if (connection) await connection.rollback();
       return error500(error, res);
-    } finally {
+  } finally {
       if (connection) connection.release();
-    }
+  }
 };
+
 
 //current price list
 const getCurrentprice = async (req, res) => {
-  const untitledId = req.companyData.untitled_id;
+  
     // Attempt to obtain a database connection
     let connection = await getConnection();
     try {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getCurrentpriceQuery = `SELECT * FROM current_price WHERE untitled_id = ${untitledId}`;
+        let getCurrentpriceQuery = `SELECT * FROM current_price`;
         
         const result = await connection.query(getCurrentpriceQuery);
         const currentPrice = result[0];

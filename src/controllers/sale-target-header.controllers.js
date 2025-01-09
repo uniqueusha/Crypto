@@ -111,6 +111,7 @@ const addSaleTargetHeader = async (req, res) => {
         }
 };
 
+
 //create current price
 const createCurrentPrice = async (req, res) => {
     const ticker = req.body.ticker ? req.body.ticker: '';
@@ -406,31 +407,33 @@ const updateSellSold = async (req, res) => {
         // Start the transaction
         await connection.beginTransaction();
 
+        const complition_id = req.body.complition_id ? parseInt(req.body.complition_id) : '';
+        const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
+        const set_footer_id = req.body.set_footer_id ? parseFloat(req.body.set_footer_id) : '';
+        const coin = req.body.coin ? req.body.coin : '';
+        const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
         // Fetch sale target header and footer details
         const getSaleTargetHeaderQuery = `
-            SELECT sth.currant_price, sth.untitled_id, sth.base_price, stf.sale_target, stf.untitled_id AS footer_untitled_id, 
-            stf.complition_id, sth.coin, stf.set_footer_id, stf.sale_target_percent 
-            FROM sale_target_header sth
-            LEFT JOIN set_target_footer stf ON stf.sale_target_id = sth.sale_target_id
-            WHERE stf.untitled_id = ?`;
+        SELECT sth.currant_price, sth.untitled_id, sth.base_price, stf.sale_target, stf.untitled_id AS footer_untitled_id, 
+        stf.complition_id, sth.coin, stf.set_footer_id, stf.sale_target_percent 
+        FROM sale_target_header sth
+        LEFT JOIN set_target_footer stf ON stf.sale_target_id = sth.sale_target_id
+        WHERE stf.untitled_id = ? AND  complition_id != 4`;
         const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
-
+        
+        
         const resultReverse = result[0].reverse();
-
+        
         // Variable to hold the data for insertion after the loop
         let soldCoinData = null;
-
+        
         if (resultReverse && resultReverse.length > 0) {
             // Loop through the results to compare values
             for (let i = 0; i < resultReverse.length; i++) {
                 const row = resultReverse[i];
                 
                 const complitionId = parseFloat(row.complition_id);
-                const complition_id = req.body.complition_id ? parseInt(req.body.complition_id) : '';
-                const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
-                const set_footer_id = req.body.set_footer_id ? parseFloat(req.body.set_footer_id) : '';
-                const coin = req.body.coin ? req.body.coin : '';
-                const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
+                
 
 
                 // Check if completion ID is 3
