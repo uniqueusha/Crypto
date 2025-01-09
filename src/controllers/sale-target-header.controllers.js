@@ -648,57 +648,92 @@ const deleteSetTargetChangeStatus = async (req, res) => {
     const sale_target_id = parseInt(req.params.id);
     const untitledId = req.companyData.untitled_id;
     const status = parseInt(req.query.status); // Validate and parse the status parameter
-    // Attempt to obtain a database connection
-    let connection = await getConnection();
-
+  
+    let connection;
+  
     try {
-        // Start a transaction
-        await connection.beginTransaction();
-        // Check if the set target  exists
-        const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ? AND untitled_id = ?";
-        const saleTargetHeaderResult = await connection.query(saleTargetHeaderQuery, [sale_target_id, untitledId]);
-        if (saleTargetHeaderResult[0].length == 0) {
-            return res.status(404).json({
-                status: 404,
-                message: "Sale Target Header Not Found.",
-            });
-        }
-
-        // Validate the status parameter
-        if (status !== 0 && status !== 1) {
-            return res.status(400).json({
-                status: 400,
-                message:
-                    "Invalid status value. Status must be 0 (inactive) or 1 (active).",
-            });
-        }
-
-        // Soft update the set target status
-        const updateQuery = `
-              UPDATE sale_target_header
-              SET status = ?
-              WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updateQuery, [status, sale_target_id, untitledId]);
-
-        const updatefooterQuery = `
-              UPDATE set_target_footer
-              SET status = ?
-              WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatefooterQuery, [status, sale_target_id, untitledId]);
-    
-        const statusMessage = status === 1 ? "activated" : "Deleted";
-        //commit the transation
-        await connection.commit();
-        return res.status(200).json({
-            status: 200,
-            message: `Set Target ${statusMessage} successfully.`,
+      connection = await getConnection();
+      await connection.beginTransaction();
+  
+      // Step 1: Check if the sale_target_header exists
+      const saleTargetHeaderQuery =
+        "SELECT * FROM sale_target_header WHERE sale_target_id = ? AND untitled_id = ?";
+      const saleTargetHeaderResult = await connection.query(saleTargetHeaderQuery, [
+        sale_target_id,
+        untitledId,
+      ]);
+  
+      if (saleTargetHeaderResult[0].length === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: "Sale Target Header Not Found.",
         });
+      }
+  
+      // Step 2: Validate the status parameter
+      if (status !== 0 && status !== 1) {
+        return res.status(400).json({
+          status: 400,
+          message:
+            "Invalid status value. Status must be 0 (inactive) or 1 (active).",
+        });
+      }
+  
+      // Step 3: Get the `ticker` associated with the `sale_target_id`
+      const getTickerQuery = `
+        SELECT ticker FROM sale_target_header
+        WHERE sale_target_id = ? AND untitled_id = ?`;
+      const tickerResult = await connection.query(getTickerQuery, [
+        sale_target_id,
+        untitledId,
+      ]);
+  
+      const ticker = tickerResult[0][0]?.ticker; // Get the first ticker
+      if (!ticker) {
+        return res.status(404).json({
+          status: 404,
+          message: "No ticker found for the given sale_target_id.",
+        });
+      }
+  
+      // Step 4: Update the status in `sale_target_header`
+      const updateHeaderQuery = `
+        UPDATE sale_target_header
+        SET status = ?
+        WHERE sale_target_id = ? AND untitled_id = ?`;
+      await connection.query(updateHeaderQuery, [status, sale_target_id, untitledId]);
+  
+      // Step 5: Update the status in `set_target_footer`
+      const updateFooterQuery = `
+        UPDATE set_target_footer
+        SET status = ?
+        WHERE sale_target_id = ? AND untitled_id = ?`;
+      await connection.query(updateFooterQuery, [status, sale_target_id, untitledId]);
+  
+      // Step 6: Delete the `ticker` from `current_price` if status is 0
+      if (status === 0) {
+        const deleteTickerQuery = `
+          DELETE FROM current_price
+          WHERE ticker = ? AND sale_target_id = ?`; // Check sale_target_id instead of untitled_id
+        await connection.query(deleteTickerQuery, [ticker, sale_target_id]);
+      }
+  
+      const statusMessage = status === 1 ? "activated" : "deleted";
+  
+      // Commit the transaction
+      await connection.commit();
+  
+      return res.status(200).json({
+        status: 200,
+        message: `Set Target ${statusMessage} successfully.`,
+      });
     } catch (error) {
-        return error500(error, res);
+      if (connection) await connection.rollback();
+      return error500(error, res);
     } finally {
-        await connection.release();
+      if (connection) connection.release();
     }
-};
+  };
 
 //set target reached list
 
