@@ -9,7 +9,8 @@ const saleTargetHeaderRoute = require('./src/routes/sale-target-header.routes');
 const adminRoute = require('./src/routes/admin.routes');
 const userTypeRoute = require('./src/routes/user-type.routes');
 const targetStatusRoute = require('./src/routes/target-status.routes');
-const complitionStatusRoute = require('./src/routes/complition-status.routes')
+const complitionStatusRoute = require('./src/routes/complition-status.routes');
+const currentPriceRoute = require('./src/routes/current-price.routes')
 // const organizationRoutes = require('./src/routes/super-admin/organization.routes');
 
 // Middleware
@@ -55,6 +56,7 @@ app.use('/v1/api/admin', adminRoute);
 app.use('/v1/api/user-type', userTypeRoute);
 app.use('/v1/api/target-status', targetStatusRoute);
 app.use('/v1/api/complition-status', complitionStatusRoute);
+app.use('/v1/api/current-price', currentPriceRoute);
 // app.use('/v1/api/organization', organizationRoutes);
 app.get('/health', async (req, res) => {
   res.json("Server is running");
