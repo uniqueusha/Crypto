@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
+const axios = require('axios');
 const app = express();
 const pool = require('./db')
 // Import routes
@@ -61,6 +62,15 @@ app.use('/v1/api/current-price', currentPriceRoute);
 app.get('/health', async (req, res) => {
   res.json("Server is running");
 });
-
+const baseUrl = 'http://localhost:3000/v1';
+const endpoint = '/api/current-price';
+setInterval(async () => {
+  try {
+    const response = await axios.get(`${baseUrl}${endpoint}`);
+    console.log('Current Price Data:', response.data);
+  } catch (error) {
+    console.error('Error hitting current price endpoint:', error.message);
+  }
+}, 7000); // 7 seconds interval
 // Export the app
 module.exports = app;
