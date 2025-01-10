@@ -63,6 +63,7 @@ app.get('/health', async (req, res) => {
   res.json("Server is running");
 });
 const baseUrl = 'http://localhost:3000/v1';
+// baseUrl: 'https://wmdevelopment.co.in:3002/v1/',
 const endpoint = '/api/current-price/add-update';
 setInterval(async () => {
   try {
@@ -71,6 +72,6 @@ setInterval(async () => {
   } catch (error) {
     // console.error('Error hitting current price endpoint:', error.message);
   }
-}, 7000); // 7 seconds interval
+}, 7000);
 // Export the app
 module.exports = app;
