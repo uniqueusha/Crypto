@@ -4,7 +4,7 @@ const currentPriceController = require("../controllers/current-price.controller"
 const checkAuth = require("../middleware/check.auth");
 
 //Add Current Price
-router.post('/', currentPriceController.addCurrentPrice);
+router.post('/add-update', currentPriceController.addCurrentPrice);
 //Get List
 router.get('/',currentPriceController.getCurrentprice);
 // //login

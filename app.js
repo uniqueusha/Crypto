@@ -63,13 +63,13 @@ app.get('/health', async (req, res) => {
   res.json("Server is running");
 });
 const baseUrl = 'http://localhost:3000/v1';
-const endpoint = '/api/current-price';
+const endpoint = '/api/current-price/add-update';
 setInterval(async () => {
   try {
-    const response = await axios.get(`${baseUrl}${endpoint}`);
-    // console.log('Current Price Data:', response.data);
+    const response = await axios.post(`${baseUrl}${endpoint}`);
+
   } catch (error) {
-    console.error('Error hitting current price endpoint:', error.message);
+    // console.error('Error hitting current price endpoint:', error.message);
   }
 }, 7000); // 7 seconds interval
 // Export the app
