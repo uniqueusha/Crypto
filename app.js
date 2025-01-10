@@ -67,7 +67,7 @@ const endpoint = '/api/current-price';
 setInterval(async () => {
   try {
     const response = await axios.get(`${baseUrl}${endpoint}`);
-    console.log('Current Price Data:', response.data);
+    // console.log('Current Price Data:', response.data);
   } catch (error) {
     console.error('Error hitting current price endpoint:', error.message);
   }
