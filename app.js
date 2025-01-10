@@ -67,6 +67,7 @@ const endpoint = '/api/current-price/add-update';
 setInterval(async () => {
   try {
     const response = await axios.post(`${baseUrl}${endpoint}`);
+
   } catch (error) {
     // console.error('Error hitting current price endpoint:', error.message);
   }
