@@ -63,7 +63,7 @@ app.get('/health', async (req, res) => {
   res.json("Server is running");
 });
 const baseUrl = 'http://localhost:3000/v1';
-// baseUrl: 'https://wmdevelopment.co.in:3002/v1/',
+// const baseUrl = 'https://wmdevelopment.co.in:3002/v1/';
 const endpoint = '/api/current-price/add-update';
 setInterval(async () => {
   try {
