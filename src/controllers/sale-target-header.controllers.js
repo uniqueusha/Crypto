@@ -160,10 +160,19 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT sh.*,cp.current_price AS UpdatedCurrentPrice FROM sale_target_header sh
-        LEFT JOIN current_price cp
-        ON cp.sale_target_id = sh.sale_target_id
-         WHERE untitled_id = ${untitledId}`;
+        let getSetTargetQuery = `SELECT 
+    sh.*, 
+    cp.current_price AS UpdatedCurrentPrice 
+FROM 
+    sale_target_header sh
+LEFT JOIN 
+    current_price cp
+ON 
+    cp.sale_target_id = sh.sale_target_id
+WHERE 
+    sh.untitled_id = ${untitledId} 
+    AND sh.status = 1;
+`;
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
@@ -183,7 +192,9 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
         }
         for (let index = 0; index < setTarget.length; index++) {
             const element = setTarget[index];
-            const current_price = parseFloat(element.UpdatedCurrentPrice);
+            const current_price = setTarget[index].UpdatedCurrentPrice;
+            // console.log('hii',current_price);
+            
             for (let index = 0; index < element.footer.length; index++) {
                 const elements = element.footer[index];
                 const sale_target = parseFloat(elements.sale_target);
