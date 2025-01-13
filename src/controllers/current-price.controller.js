@@ -52,11 +52,11 @@ const addCurrentPrice = async (req, res) => {
     const tickers = Array.from(new Set(saleTargetData.map((element) => element.ticker))).join(",");
 
     // Fetch API settings
-    const apiSettingsQuery = `SELECT url, ticker, currency_name, api_key FROM api_settings`;
+    const apiSettingsQuery = `SELECT url, ticker, currency_name FROM api_settings`;
     const apiSettingsResult = await connection.query(apiSettingsQuery);
 
     const apiUrl = apiSettingsResult[0].map(
-      (row) => `${row.url}${tickers}${row.currency_name}${row.api_key}`
+      (row) => `${row.url}${tickers}${row.currency_name}`
     )[0]; // Assuming the first URL is valid
 
     // Fetch current price data from the API
@@ -82,41 +82,36 @@ const addCurrentPrice = async (req, res) => {
           untitled_id,
         ]);
 
-        const currentTimeStamp = new Date().toISOString(); // Current timestamp for `cts`
-        const status = 1; // Assuming status = 1 for active entries
+        // const currentTimeStamp = new Date().toISOString(); // Current timestamp for `cts`
+        // const status = 1; // Assuming status = 1 for active entries
 
         if (checkExistsResult[0].count > 0) {
           // Update existing record
           const updateQuery = `
             UPDATE current_price 
-            SET current_price = ?, cts = ?, status = ? 
+            SET current_price = ?
             WHERE ticker = ? AND untitled_id = ?
           `;
           await connection.query(updateQuery, [
             price,
-            currentTimeStamp,
-            status,
+    
             ticker,
             untitled_id,
           ]);
         } else {
           // Insert new record
           const insertQuery = `
-            INSERT INTO current_price (ticker, current_price, sale_target_id, untitled_id, cts, status) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO current_price (ticker, current_price, sale_target_id, untitled_id) 
+            VALUES (?, ?, ?, ?)
           `;
           await connection.query(insertQuery, [
             ticker,
             price,
             sale_target_id,
-            untitled_id,
-            currentTimeStamp,
-            status,
+            untitled_id
           ]);
         }
-      } else {
-        console.warn(`No price found for ticker: ${ticker}`);
-      }
+      } 
     }
 
     // Commit the transaction
