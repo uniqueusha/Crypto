@@ -73,5 +73,6 @@ setInterval(async () => {
     // console.error('Error hitting current price endpoint:', error.message);
   }
 }, 7000);
+
 // Export the app
 module.exports = app;
