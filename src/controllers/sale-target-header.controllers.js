@@ -2,6 +2,7 @@ const pool = require("../../db");
 const axios = require('axios');
 const xlsx = require('xlsx');
 const fs = require('fs');
+const { log } = require("console");
 // Function to obtain a database connection
 const getConnection = async () => {
     try {
@@ -109,42 +110,115 @@ const addSaleTargetHeader = async (req, res) => {
 
 
 //create current price
+// const createCurrentPrice = async (req, res) => {
+//     const ticker = req.body.ticker ? req.body.ticker : '';
+//     if (!ticker) {
+//         return error422("Ticker  is required.", res);
+//     }
+//     let connection = await getConnection();
+//     try {
+
+//         //Start the transaction
+//         await connection.beginTransaction();
+//         // let final_sale_price = base_price * return_x;
+//         if (!ticker) {
+//             const insertTickerQuery = `INSERT INTO api_settings ( ticker ) VALUES (?)`;
+//             const insertTickerResult = await connection.query(insertTickerQuery, [tricker]);
+//         } else {
+//             const updateTickerQuery = `UPDATE api_settings SET ticker = ? WHERE id = 1`;
+//             const updateTickerResult = await connection.query(updateTickerQuery, [ticker]);
+//         }
+//         const query = 'SELECT url, ticker, currency_name FROM api_settings';
+//         const result = await connection.query(query);
+//         // Loop through the results and concatenate the fields
+//         const fullUrls = result[0].map(row => `${row.url}${row.ticker}${row.currency_name}`);
+//         const currentPriceUrl = await axios.get(fullUrls);
+//         const cryptoSymbol = ticker;
+//         const price = currentPriceUrl.data[cryptoSymbol].USD;
+
+//         //commit the transation
+//         await connection.commit();
+//         res.status(200).json({
+//             status: 200,
+//             message: "Fetch Current Price successfully",
+//             data: {
+//                 currentPrice: price
+//             }
+//         });
+//     } catch (error) {
+//         return error500(error, res);
+//     } finally {
+//         if (connection) connection.release();
+//     }
+// };
+
+
 const createCurrentPrice = async (req, res) => {
     const ticker = req.body.ticker ? req.body.ticker : '';
     if (!ticker) {
-        return error422("Ticker  is required.", res);
+        return error422("Ticker is required.", res);
     }
-    let connection = await getConnection();
-    try {
 
-        //Start the transaction
+    let connection;
+    try {
+        connection = await getConnection();
+
+        // Start the transaction
         await connection.beginTransaction();
-        // let final_sale_price = base_price * return_x;
-        if (!ticker) {
-            const insertTickerQuery = `INSERT INTO api_settings ( ticker ) VALUES (?)`;
-            const insertTickerResult = await connection.query(insertTickerQuery, [tricker]);
+
+        // Check if ticker exists in api_settings, otherwise insert it
+        const existingTickerQuery = `SELECT COUNT(*) AS count FROM api_settings WHERE id = 1`;
+        const [existingResult] = await connection.query(existingTickerQuery);
+        if (existingResult[0].count === 0) {
+            const insertTickerQuery = `INSERT INTO api_settings (ticker) VALUES (?)`;
+            await connection.query(insertTickerQuery, [ticker]);
         } else {
             const updateTickerQuery = `UPDATE api_settings SET ticker = ? WHERE id = 1`;
-            const updateTickerResult = await connection.query(updateTickerQuery, [ticker]);
+            await connection.query(updateTickerQuery, [ticker]);
         }
-        const query = 'SELECT url, ticker, currency_name FROM api_settings';
-        const result = await connection.query(query);
-        // Loop through the results and concatenate the fields
-        const fullUrls = result[0].map(row => `${row.url}${row.ticker}${row.currency_name}`);
-        const currentPriceUrl = await axios.get(fullUrls);
-        const cryptoSymbol = ticker;
-        const price = currentPriceUrl.data[cryptoSymbol].USD;
 
-        //commit the transation
+        // Fetch URL details from `api_settings`
+        const query = 'SELECT url, ticker, currency_name FROM api_settings WHERE ticker = ?';
+        const [result] = await connection.query(query, [ticker]);
+
+        if (result.length === 0) {
+            return res.status(404).json({ status: 404, message: "No API settings found for the given ticker." });
+        }
+
+        // Construct the full URL to fetch the price
+        const { url, ticker: fetchedTicker, currency_name } = result[0];
+        const fullUrl = `${url}${fetchedTicker}${currency_name}`;
+
+        // Fetch current price from the API
+        const response = await axios.get(fullUrl);
+        const priceRaw = response.data?.[ticker]?.USD;
+
+        if (priceRaw === undefined) {
+            throw new Error("Price data not found for the given ticker in the API response.");
+        }
+
+        // Handle scientific notation (e.g., 5.1e-8, 5e-10) conversion and regular numbers
+        let price = priceRaw;
+
+        // If the price is in scientific notation (e.g., "5e-8"), convert it to decimal format
+        if (/e/.test(priceRaw)) {
+            price = parseFloat(priceRaw).toFixed(10); // Convert scientific notation to a readable decimal with 10 digits
+        } else {
+            price = priceRaw.toString(); // If not in scientific notation, keep as-is
+        }
+
+        // Commit the transaction
         await connection.commit();
+
+        // Respond with the fetched and formatted price
         res.status(200).json({
             status: 200,
             message: "Fetch Current Price successfully",
-            data: {
-                currentPrice: price
-            }
+            data: { currentPrice: price },
         });
     } catch (error) {
+        console.error(error);
+        if (connection) await connection.rollback();
         return error500(error, res);
     } finally {
         if (connection) connection.release();
@@ -161,19 +235,11 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
         //Start the transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `SELECT 
-    sh.*, 
-    cp.current_price AS UpdatedCurrentPrice 
-FROM 
-    sale_target_header sh
-LEFT JOIN 
-    current_price cp
-ON 
-    cp.sale_target_id = sh.sale_target_id
-WHERE 
-    sh.untitled_id = ${untitledId} 
-    AND sh.status = 1;
-`;
+        let getSetTargetQuery = `SELECT sh.*, cp.current_price AS UpdatedCurrentPrice 
+        FROM sale_target_header sh 
+        LEFT JOIN current_price cp
+        ON cp.sale_target_id = sh.sale_target_id
+        WHERE sh.untitled_id = ${untitledId} AND sh.status = 1;`;
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
@@ -193,8 +259,9 @@ WHERE
         }
         for (let index = 0; index < setTarget.length; index++) {
             const element = setTarget[index];
+            const currentPrice = setTarget[index].currant_price;
+            
             const current_price = setTarget[index].UpdatedCurrentPrice;
-            // console.log('hii',current_price);
             
             for (let index = 0; index < element.footer.length; index++) {
                 const elements = element.footer[index];
@@ -208,7 +275,11 @@ WHERE
                 if (current_price > sale_target) {
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 3 WHERE untitled_id = ? AND sale_target_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query(updateStatusQuery, [untitledId, sale_target_id, sale_target]);
-                } else {
+                } else if (currentPrice > sale_target){
+                    const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 2, complition_id = 3 WHERE untitled_id = ? AND sale_target_id = ? AND sale_target = ?';
+                    const updateStatusResult = await connection.query(updateStatusQuery, [untitledId, sale_target_id, sale_target]);
+                }
+                else {
                     const updateStatusQuery = 'UPDATE set_target_footer SET target_id = 1, complition_id = 2 WHERE untitled_id = ? AND sale_target_id = ? AND sale_target = ?';
                     const updateStatusResult = await connection.query(updateStatusQuery, [untitledId, sale_target_id, sale_target])
                 }
@@ -258,6 +329,8 @@ const getSetTargets = async (req, res) => {
             }
         }
         getSetTargetQuery += " ORDER BY sale_date DESC";
+        let result = await connection.query(getSetTargetQuery);
+        let setTarget = result[0];
         // Apply pagination if both page and perPage are provided
         let total = 0;
         if (page && perPage) {
@@ -267,8 +340,6 @@ const getSetTargets = async (req, res) => {
             const start = (page - 1) * perPage;
             getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
         }
-        let result = await connection.query(getSetTargetQuery);
-        let setTarget = result[0];
 
         //get set_header_footer
         for (let i = 0; i < setTarget.length; i++) {
@@ -417,501 +488,276 @@ const getSetTargetDownload = async (req, res) => {
     }
 };
 
-// update sell to sold
-// const updateSellSold = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         const complition_id = req.body.complition_id ? parseInt(req.body.complition_id) : '';
-//         const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
-//         const set_footer_id = req.body.set_footer_id ? parseFloat(req.body.set_footer_id) : '';
-//         const coin = req.body.coin ? req.body.coin : '';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-//         // Fetch sale target header and footer details
-//         const getSaleTargetHeaderQuery = `
-//         SELECT sth.currant_price, sth.untitled_id, sth.base_price, stf.sale_target, stf.untitled_id AS footer_untitled_id, 
-//         stf.complition_id, sth.coin, stf.set_footer_id, stf.sale_target_percent 
-//         FROM sale_target_header sth
-//         LEFT JOIN set_target_footer stf ON stf.sale_target_id = sth.sale_target_id
-//         WHERE stf.untitled_id = ? AND  complition_id != 4`;
-//         const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
-
-
-//         const resultReverse = result[0].reverse();
-
-//         // Variable to hold the data for insertion after the loop
-//         let soldCoinData = null;
-
-//         if (resultReverse && resultReverse.length > 0) {
-//             // Loop through the results to compare values
-//             for (let i = 0; i < resultReverse.length; i++) {
-//                 const row = resultReverse[i];
-
-//                 const complitionId = parseFloat(row.complition_id);
-
-
-
-//                 // Check if completion ID is 3
-//                 if (complitionId === 3) {
-//                     // Update complition_id to 4
-//                     const updateSoldQuery = `
-//                         UPDATE set_target_footer 
-//                         SET complition_id = ?
-//                         WHERE untitled_id = ? AND complition_id = 3 AND set_footer_id = ?`;
-//                     await connection.query(updateSoldQuery, [complition_id, untitledId, set_footer_id]);
-
-//                     // Check if complition_id is 4, collect data for insertion after the loop
-//                     if (complition_id === 4) {
-//                         // Gather values to insert only once
-//                         // const coin = row.coin;
-//                         const sale_target_percent = row.sale_target_percent;
-
-
-//                         // Collect only one set of values to insert after the loop
-//                         if (coin && sale_target_percent && currant_price && base_price) {
-//                             soldCoinData = [coin, set_footer_id, sale_target_percent, currant_price, base_price, untitledId];
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-
-//         // Insert into sold_coin table once after the loop, only if the data is available
-//         if (soldCoinData) {
-//             const insertSoldCoinQuery = `
-//                 INSERT INTO sold_coin (coin, set_footer_id, sale_target_percent, sold_current_price, base_price, untitled_id) 
-//                 VALUES (?, ?, ?, ?, ?, ?)`;
-//             await connection.query(insertSoldCoinQuery, soldCoinData);
-//         }
-
-//         // Commit the transaction
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell to Sold updated successfully",
-//         });
-//     } catch (error) {
-//         // Rollback the transaction in case of error
-//         if (connection) await connection.rollback();
-
-//         return error500(error, res);
-//     } finally {
-//         if (connection) {
-//             connection.release();
-//         }
-//     }
-// };
-
-// const updateSellSold1 = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-//     let connection = await getConnection();
-//     try {
-
-//         //Start the transaction
-//         await connection.beginTransaction();
-//         let soldCoinData = null;
-
-//         const sale_target_id = req.body.sale_target_id ? req.body.sale_target_id : '';
-//         const complition_id = req.body.complition_id ? req.body.complition_id : '';
-//         const currant_price = req.body.currant_price ? req.body.currant_price : '';
-//         const set_footer_id = req.body.set_footer_id ? req.body.set_footer_id : '';
-//         const coin = req.body.coin ? req.body.coin : '';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-
-//         let getSetTargetQuery = `SELECT * FROM sale_target_header
-//         WHERE untitled_id = ${untitledId}`;
-//         let result = await connection.query(getSetTargetQuery);
-//         let setTarget = result[0];
-
-//         //get set_header_footer
-//         for (let i = 0; i < setTarget.length; i++) {
-//             const element = setTarget[i];
-
-//             let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-//             LEFT JOIN target_status ts
-//             ON ts.target_id = stf.target_id
-//             LEFT JOIN complition_status cs
-//             ON cs.complition_id = stf.complition_id 
-//             WHERE stf.sale_target_id = ${element.sale_target_id} AND
-//             stf. untitled_id = ${untitledId} AND stf.complition_id = 3`;
-//             setFooterResult = await connection.query(setFooterQuery);
-//             setTarget[i]['footer'] = setFooterResult[0].reverse();
-//         }
-//         for (let index = 0; index < setTarget.length; index++) {
-//             const element = setTarget[index];
-
-//             for (let index = 0; index < element.footer.length; index++) {
-//                 const elements = element.footer[index];
-//                 const complitionId = parseFloat(elements.complition_id);
-//                 const sale_target_id = parseFloat(elements.sale_target_id);
-//                 const set_footer_id = parseFloat(elements.set_footer_id);
-//                 if (complition_id === 4) {
-//                     continue
-//                 }
-
-
-//                 // Update complition_id = 3 to complition_id = 4
-//                 if (complitionId === 3) {
-//                     const updateQuery = `
-//         UPDATE set_target_footer
-//         SET complition_id = ?
-//         WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//                     const updateResult = await connection.query(updateQuery, [complition_id, sale_target_id, untitledId, set_footer_id]);
-//                 }
-//                 // Check if complition_id is 4, collect data for insertion after the loop
-//                 if (complitionId === 4) {
-
-//                     const sale_target_percent = row.sale_target_percent;
-
-
-//                     // Collect only one set of values to insert after the loop
-//                     if (coin && sale_target_percent && currant_price && base_price) {
-//                         soldCoinData = [coin, set_footer_id, sale_target_percent, currant_price, base_price, untitledId];
-//                     }
-//                 }
-//             }
-//         }
-
-//         // Insert into sold_coin table once after the loop, only if the data is available
-//         if (soldCoinData) {
-//             const insertSoldCoinQuery = `
-//                 INSERT INTO sold_coin (coin, set_footer_id, sale_target_percent, sold_current_price, base_price, untitled_id) 
-//                 VALUES (?, ?, ?, ?, ?, ?)`;
-//             await connection.query(insertSoldCoinQuery, soldCoinData);
-//         }
-
-//         //commit the transation
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell To Sold Update successfully",
-
-//         });
-//     } catch (error) {
-//         return error500(error, res);
-//     } finally {
-//         await connection.release();
-//     }
-// };
-// const updateSellSold = async (req, res) => {
-    
-//     const untitledId = req.companyData.untitled_id;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-//         const sale_target_id = req.body.sale_target_id ? req.body.sale_target_id : '';
-//         const complitionId = req.body.complition_id ? req.body.complition_id : '';
-//         const currant_price = req.body.currant_price ? req.body.currant_price : '';
-//         const set_footer_id = req.body.set_footer_id ? req.body.set_footer_id : '';
-//         const coin = req.body.coin ? req.body.coin : '';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-
-//         // Fetch sale target header and footer details
-//         const getSaleTargetHeaderQuery = `
-//         SELECT * FROM sale_target_header
-//         WHERE untitled_id = ${untitledId}`;
-//         const result = await connection.query(getSaleTargetHeaderQuery, [untitledId]);
-//         let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-//             LEFT JOIN target_status ts
-//             ON ts.target_id = stf.target_id
-//             LEFT JOIN complition_status cs
-//             ON cs.complition_id = stf.complition_id 
-//             WHERE stf.sale_target_id = ? AND
-//             stf. untitled_id = ${untitledId} AND stf.complition_id = 3`;
-//         setFooterResult = await connection.query(setFooterQuery, [sale_target_id]);
-//         result['footer'] = setFooterResult[0].reverse();
-        
-        
-//         const complition_id = setFooterResult[0][0].complition_id;
-        
-        
-//         // Variable to hold the data for insertion after the loop
-        
-//         // if (complition_id === 4) {
-//             //     continue
-//             // }
-//             // Update complition_id = 3 to complition_id = 4
-//             if (complition_id === 3) {
-//                 const updateQuery = `
-//                 UPDATE set_target_footer
-//                 SET complition_id = ?
-//                 WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//                 const updateResult = await connection.query(updateQuery, [complitionId, sale_target_id, untitledId, set_footer_id]);
-//                 console.log(updateResult);
-//         }
-//         // Check if complition_id is 4, collect data for insertion after the loop
-//         if (complition_id === 4) {
-//             const insertSoldCoinQuery = `
-//         INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
-//         VALUES (?, ?, ?, ?, ?)`;
-//         const insertSoldCoinvalue = [coin, set_footer_id, currant_price, base_price, untitledId]
-//         const insertSoldCoinResult = await connection.query(insertSoldCoinQuery, insertSoldCoinvalue);   
-//         }
-       
-        
-
-//         // Commit the transaction
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell to Sold updated successfully",
-//         });
-//     } catch (error) {
-//         console.log(error);
-        
-//         // Rollback the transaction in case of error
-//         if (connection) await connection.rollback();
-
-//         return error500(error, res);
-//     } finally {
-//         if (connection) {
-//             connection.release();
-//         }
-//     }
-// };
-
-
-// const updateSellSold = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         const sale_target_id = req.body.sale_target_id || '';
-//         const complitionId = req.body.complition_id || '';
-//         const currant_price = req.body.currant_price || '';
-//         const set_footer_id = req.body.set_footer_id || '';
-//         const coin = req.body.coin || '';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-
-//         // if (!sale_target_id || !complitionId || !set_footer_id || !currant_price || !coin || !base_price) {
-//         //     throw new Error("Missing required fields.");
-//         // }
-
-//         // Fetch sale target footer details where complition_id = 3
-//         const setFooterQuery = `
-//         SELECT stf.*, ts.target_status, cs.complition_status 
-//         FROM set_target_footer stf
-//         LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-//         LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
-//         WHERE stf.sale_target_id = ? 
-//           AND stf.untitled_id = ? 
-//           AND stf.complition_id = 3`;
-//         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId]);
-
-//         // if (!footerResult.length) {
-//         //     return res.status(404).json({ status: 404, message: "No footer records found with complition_id = 3." });
-//         // }
-
-//         const complition_id = footerResult[0].complition_id;
-
-//         // Update complition_id = 3 to complition_id = 4
-//         if (complition_id === 3) {
-//             const updateQuery = `
-//             UPDATE set_target_footer
-//             SET complition_id = ?
-//             WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//             const [updateResult] = await connection.query(updateQuery, [complitionId, sale_target_id, untitledId, set_footer_id]);
-//             // console.log("Update Query Result:", updateResult);
-
-//             // if (updateResult.affectedRows === 0) {
-//             //     throw new Error("Update failed: No rows affected.");
-//             // }
-//         }
-
-//         // Ensure complition_id = 4 before attempting to insert
-//         const checkUpdatedFooterQuery = `
-//         SELECT complition_id 
-//         FROM set_target_footer 
-//         WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//         const [updatedFooterResult] = await connection.query(checkUpdatedFooterQuery, [sale_target_id, untitledId, set_footer_id]);
-
-//         if (updatedFooterResult.length && updatedFooterResult[0].complition_id === 4) {
-//             // Insert into sold_coin
-//             const insertSoldCoinQuery = `
-//             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
-//             VALUES (?, ?, ?, ?, ?)`;
-//             const insertSoldCoinValues = [coin, set_footer_id, currant_price, base_price, untitledId];
-//             const [insertSoldCoinResult] = await connection.query(insertSoldCoinQuery, insertSoldCoinValues);
-//             // console.log("Insert Query Result:", insertSoldCoinResult);
-
-//             // if (insertSoldCoinResult.affectedRows === 0) {
-//             //     throw new Error("Insert failed: No rows inserted.");
-//             // }
-//         }
-//         //  else {
-//         //     throw new Error("Footer record complition_id was not updated to 4.");
-//         // }
-
-//         // Commit the transaction
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell to Sold updated and data inserted successfully.",
-//         });
-//     } catch (error) {
-//         console.error("Error:", error);
-
-//         // Rollback the transaction in case of error
-//         if (connection) await connection.rollback();
-
-//         res.status(500).json({ status: 500, message: "Internal server error.", error: error.message });
-//     } finally {
-//         if (connection) {
-//             connection.release();
-//         }
-//     }
-// };
-
-// const updateSellSold1 = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         const sale_target_id = req.body.sale_target_id ? req.body.sale_target_id :'';
-//         const complitionId = req.body.complition_id ? req.body.complition_id :'';
-//         const currant_price = req.body.currant_price ? req.body.complition_id :'';
-//         const set_footer_id = req.body.set_footer_id ? req.body.set_footer_id :'';
-//         const coin = req.body.coin ? req.body.coin :'';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-
-//         const setHeaderQuery = `
-//         SELECT * FROM sale_target_header
-//         WHERE sale_target_id = ? 
-//           AND untitled_id = ? `;
-//         const setHeaderResult = await connection.query(setHeaderQuery, [sale_target_id, untitledId]);
-
-//         // Fetch sale target footer details where complition_id = 3
-//         const setFooterQuery = `
-//         SELECT stf.*, ts.target_status, cs.complition_status 
-//         FROM set_target_footer stf
-//         LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-//         LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
-//         WHERE stf.sale_target_id = ? 
-//           AND stf.untitled_id = ? 
-//           AND stf.complition_id = 3`;
-//         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId]);
-
-//         const complition_id = footerResult[0].complition_id;
-
-//         // Update complition_id = 3 to complition_id = 4
-//         if (complition_id === 3) {
-//             const updateQuery = `
-//             UPDATE set_target_footer
-//             SET complition_id = ?
-//             WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//             const [updateResult] = await connection.query(updateQuery, [complitionId, sale_target_id, untitledId, set_footer_id]);
-           
-//         }
-
-//         // Ensure complition_id = 4 before attempting to insert
-//         const checkUpdatedFooterQuery = `
-//         SELECT complition_id 
-//         FROM set_target_footer 
-//         WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ?`;
-//         const [updatedFooterResult] = await connection.query(checkUpdatedFooterQuery, [sale_target_id, untitledId, set_footer_id]);
-
-//         if (updatedFooterResult.length && updatedFooterResult[0].complition_id === 4) {
-//             // Insert into sold_coin
-//             const insertSoldCoinQuery = `
-//             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
-//             VALUES (?, ?, ?, ?, ?)`;
-//             const insertSoldCoinValues = [coin, set_footer_id, currant_price, base_price, untitledId];
-//             const [insertSoldCoinResult] = await connection.query(insertSoldCoinQuery, insertSoldCoinValues);
-//         }
-
-//         // Commit the transaction
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell to Sold updated and data inserted successfully.",
-//         });
-//     } catch (error) {
-//         console.error("Error:", error);
-
-//         // Rollback the transaction in case of error
-//         if (connection) await connection.rollback();
-//         res.status(500).json({ status: 500, message: "Internal server error.", error: error.message });
-//     } finally {
-//         if (connection) {
-//             connection.release();
-//         }
-//     }
-// };
 
 const updateSellSold = async (req, res) => {
-    
     const untitledId = req.companyData.untitled_id;
-    
+
     let connection = await getConnection();
     try {
         // Start the transaction
         await connection.beginTransaction();
-        
-        const sale_target_id = req.body.sale_target_id ? req.body.sale_target_id : '';
-        const complition_id = req.body.complition_id ? req.body.complition_id : ''; 
-        const currant_price = req.body.currant_price ? req.body.currant_price : '';
-        const set_footer_id = req.body.set_footer_id ? req.body.set_footer_id : '';
-        const coin = req.body.coin ? req.body.coin : '';
+
+        // Extract parameters from the request body
+        const sale_target_id = req.body.sale_target_id || '';
+        const complition_id = req.body.complition_id;
+        const currant_price = req.body.currant_price || '';
+        const set_footer_id = req.body.set_footer_id || '';
+        const coin = req.body.coin || '';
         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
 
         // Fetch current footer details
         const setFooterQuery = `
         SELECT * FROM set_target_footer 
         WHERE sale_target_id = ? 
-          AND untitled_id = ? 
-          AND set_footer_id = ?`;
+        AND untitled_id = ? 
+        AND set_footer_id = ?`;
         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
 
+        // Validate if footer data exists
+        if (footerResult.length === 0) {
+            return res.status(404).json({ status: 404, message: "Footer data not found." });
+        }
+
         const currentComplitionId = footerResult[0].complition_id;
-        const saleTargetId = footerResult[0].sale_target_id;
-        const setFooterId = footerResult[0].set_footer_id;
-       
-        // Only update if complition_id is 3
-        if (currentComplitionId === 3 && saleTargetId && setFooterId) {
+
+        // Prevent reversion from complition_id = 4 to any other value
+        if (currentComplitionId === 4 && complition_id !== 4) {
+            return res.status(400).json({
+                status: 400,
+                message: "Invalid update: Once sold, the coin cannot revert to another position.",
+            });
+        }
+
+        // Update complition_id only from 3 to 4
+        if (currentComplitionId === 3 && complition_id === 4) {
             const updateQuery = `
             UPDATE set_target_footer
-            SET complition_id = 4
-            WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? `;
-            const updateResult = await connection.query(updateQuery, [ sale_target_id, untitledId, set_footer_id]);
-        } 
+            SET complition_id = ?
+            WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
+            const [updateResult] = await connection.query(updateQuery, [complition_id, sale_target_id, untitledId, set_footer_id]);
 
-        
-        if (complition_id === 4) {
-            // Insert into sold_coin if complition_id = 4
+            // Verify if the row was actually updated
+            if (updateResult.affectedRows === 0) {
+                throw new Error("Update failed. The record might have been modified by another transaction.");
+            }
+
+            // Insert coin data into sold_coin table
             const insertSoldCoinQuery = `
             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
             VALUES (?, ?, ?, ?, ?)`;
-            const insertSoldCoinValues = [coin, set_footer_id, currant_price, base_price, untitledId];
-            await connection.query(insertSoldCoinQuery, insertSoldCoinValues);
+            await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
         }
 
         // Commit the transaction
         await connection.commit();
         res.status(200).json({
             status: 200,
-            message: "Sell to Sold updated and data inserted successfully.",
+            message: "Sell to Sold updated successfully.",
         });
     } catch (error) {
-         await connection.rollback();
-        return error500(error, res);
+        // Rollback transaction on error
+        // await connection.rollback();
+        res.status(500).json({
+            status: 500,
+            message: "Internal server error.",
+            error: error.message,
+        });
     } finally {
         if (connection) {
             connection.release();
         }
     }
 };
+
+
+// const updateSellSold = async (req, res) => {
+//     const untitledId = req.companyData.untitled_id;
+
+//     let connection = await getConnection();
+//     try {
+//         // Start the transaction
+//         await connection.beginTransaction();
+
+//         // Extract parameters from the request body
+//         const sale_target_id = req.body.sale_target_id ? req.body.sale_target_id : '';
+//         const complition_id = req.body.complition_id ? req.body.complition_id : '';
+//         const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : '';
+//         const set_footer_id = req.body.set_footer_id ? req.body.set_footer_id : '';
+//         const coin = req.body.coin ? req.body.coin : '';
+//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
+
+//         // Fetch current footer details
+//         const setFooterQuery = `
+//         SELECT * FROM set_target_footer 
+//         WHERE sale_target_id = ? 
+//           AND untitled_id = ? 
+//           AND set_footer_id = ?`;
+//         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
+
+//         // Validate if footer data exists
+//         if (footerResult.length === 0) {
+//             return res.status(404).json({ status: 404, message: "Footer data not found." });
+//         }
+
+//         const currentComplitionId = footerResult[0].complition_id;
+
+//         // Prevent any coin that is already sold (complition_id = 4) from reverting back to 3
+//         if (currentComplitionId === 4) {
+//             return res.status(400).json({
+//                 status: 400,
+//                 message: "Invalid update: Once sold, the coin cannot revert to another position.",
+//             });
+//         }
+
+//         // Query to check how many coins are already sold (complition_id = 4)
+//         const countSoldCoinsQuery = `
+//         SELECT COUNT(*) AS sold_count 
+//         FROM set_target_footer
+//         WHERE sale_target_id = ? 
+//           AND untitled_id = ? 
+//           AND complition_id = 4`;
+//         const [soldCoinCount] = await connection.query(countSoldCoinsQuery, [sale_target_id, untitledId]);
+
+//         // If it's the fifth coin being sold (sold count is 4), revert previous four coins to complition_id = 3 (only if they are not already sold)
+//         if (soldCoinCount[0].sold_count === 4) {
+//             // Update previous four coins to complition_id = 3 (but only those which are not yet sold, i.e., complition_id = 3)
+//             const updatePreviousCoinsQuery = `
+//             UPDATE set_target_footer
+//             SET complition_id = 3
+//             WHERE sale_target_id = ? 
+//               AND untitled_id = ? 
+//               AND complition_id = 3
+//             LIMIT 4`;
+//             await connection.query(updatePreviousCoinsQuery, [sale_target_id, untitledId]);
+
+//             // Insert sold coin into sold_coin table
+//             const insertSoldCoinQuery = `
+//             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
+//             VALUES (?, ?, ?, ?, ?)`;
+//             await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
+//         }
+
+//         // Update complition_id for the current coin (only from 3 to 4)
+//         if (currentComplitionId === 3 && complition_id === 4) {
+//             const updateQuery = `
+//             UPDATE set_target_footer
+//             SET complition_id = ?
+//             WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
+//             await connection.query(updateQuery, [complition_id, sale_target_id, untitledId, set_footer_id]);
+
+//             // Insert sold coin data into sold_coin table
+//             const insertSoldCoinQuery = `
+//             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
+//             VALUES (?, ?, ?, ?, ?)`;
+//             await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
+//         } else {
+//             return res.status(400).json({
+//                 status: 400,
+//                 message: "Invalid transition: Only coins with complition_id = 3 can be sold to complition_id = 4.",
+//             });
+//         }
+
+//         // Commit the transaction
+//         await connection.commit();
+//         res.status(200).json({
+//             status: 200,
+//             message: "Sell to Sold updated successfully.",
+//         });
+//     } catch (error) {
+//         // Rollback transaction on error
+//         await connection.rollback();
+//         return res.status(500).json({
+//             status: 500,
+//             message: "Internal server error.",
+//             error: error.message,
+//         });
+//     } finally {
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// };
+
+ 
+// const updateSellSolddone = async (req, res) => {
+//     const untitledId = req.companyData.untitled_id;
+
+//     let connection = await getConnection();
+//     try {
+//         // Start the transaction
+//         await connection.beginTransaction();
+
+//         // Extract parameters from the request body
+//         const sale_target_id = req.body.sale_target_id || '';
+//         const complition_id = req.body.complition_id;
+        
+        
+//         const currant_price = req.body.currant_price || '';
+//         const set_footer_id = req.body.set_footer_id || '';
+//         const coin = req.body.coin || '';
+//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
+        
+//         // Fetch current footer details
+//         const setFooterQuery = `
+//         SELECT * FROM set_target_footer 
+//         WHERE sale_target_id = ? 
+//         AND untitled_id = ? 
+//         AND set_footer_id = ?`;
+//         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
+       
+        
+//         // Validate if footer data exists
+//         if (footerResult.length === 0) {
+//             return res.status(404).json({ status: 404, message: "Footer data not found." });
+//         }
+
+//         const currentComplitionId = footerResult[0].complition_id;
+//         console.log("currentComplitionId",currentComplitionId);
+        
+
+//         // Prevent reversion from complition_id = 4 to any other value
+//         if (currentComplitionId === 4 && complition_id !== 4) {
+//             return res.status(400).json({
+//                 status: 400,
+//                 message: "Invalid update: Once sold, the coin cannot revert to another position.",
+//             });
+//         }
+
+//         // Update complition_id only from 3 to 4
+//         if (currentComplitionId === 3) {
+//             const updateQuery = `
+//             UPDATE set_target_footer
+//             SET complition_id = ?
+//             WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
+//             await connection.query(updateQuery, [complition_id, sale_target_id, untitledId, set_footer_id]);
+
+//             // Insert coin data into sold_coin table
+//             const insertSoldCoinQuery = `
+//             INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
+//             VALUES (?, ?, ?, ?, ?)`;
+//             await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
+//         }
+
+//         // Commit the transaction
+//         await connection.commit();
+//         res.status(200).json({
+//             status: 200,
+//             message: "Sell to Sold updated successfully.",
+//         });
+//     } catch (error) {
+//         // Rollback transaction on error
+        
+//         return res.status(500).json({
+//             status: 500,
+//             message: "Internal server error.",
+//             error: error.message,
+//         });
+//     } finally {
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// };
 
 
 
@@ -1270,109 +1116,7 @@ const getSetTargetReached = async (req, res) => {
         if (connection) connection.release();
     }
 };
-// const getSetTargetReached = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-//     const { page, perPage, key } = req.query;
 
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         // Base queries
-//         let getSetTargetQuery = `
-//             SELECT * FROM sale_target_header 
-//             WHERE untitled_id = ${untitledId} AND status = 1`;
-//         let countQuery = `
-//             SELECT COUNT(*) AS total 
-//             FROM sale_target_header 
-//             WHERE untitled_id = ${untitledId}`;
-
-//         // Add search/filtering if a key is provided
-//         if (key) {
-//             const lowercaseKey = key.toLowerCase().trim();
-//             if (lowercaseKey === "activated") {
-//                 getSetTargetQuery += ` AND status = 1`;
-//                 countQuery += ` AND status = 1`;
-//             } else if (lowercaseKey === "deactivated") {
-//                 getSetTargetQuery += ` AND status = 0`;
-//                 countQuery += ` AND status = 0`;
-//             } else {
-//                 getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-//                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-//             }
-//         }
-
-//         getSetTargetQuery += " ORDER BY sale_date DESC";
-
-//         // Apply pagination if both `page` and `perPage` are provided
-//         let total = 0;
-//         if (page && perPage) {
-//             const totalResult = await connection.query(countQuery);
-//             total = parseInt(totalResult[0][0].total);
-
-//             const start = (page - 1) * perPage;
-//             getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
-//         }
-
-//         // Fetch the header data
-//         let result = await connection.query(getSetTargetQuery);
-//         let setTarget = result[0];
-
-//         // Filter headers based on footer data
-//         let filteredData = [];
-//         for (let i = 0; i < setTarget.length; i++) {
-//             const element = setTarget[i];
-
-//             // Fetch all footer data for the current header, excluding complition_id = 4
-//             let setFooterQuery = `
-//                 SELECT stf.*, ts.target_status, cs.complition_status 
-//                 FROM set_target_footer stf
-//                 LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-//                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
-//                 WHERE stf.sale_target_id = ${element.sale_target_id} 
-//                 AND stf.untitled_id = ${untitledId}
-//                 AND stf.complition_id != 4`; // Exclude records with complition_id = 4
-
-//             const setFooterResult = await connection.query(setFooterQuery);
-
-//             // Only include the header if there is valid footer data (i.e., excluding complition_id = 4)
-//             if (setFooterResult[0] && setFooterResult[0].length > 0) {
-//                 // Include footer data that doesn't have complition_id = 4
-//                 element['footer'] = setFooterResult[0].reverse(); // Include all footer data
-//                 filteredData.push(element);
-//             } else {
-//                 // If no matching footer is found, include the header with an empty footer array
-//                 element['footer'] = [];
-//                 filteredData.push(element);
-//             }
-//         }
-
-//         // Build the response object
-//         const data = {
-//             status: 200,
-//             message: "Set Target retrieved successfully",
-//             data: filteredData,
-//         };
-
-//         // Add pagination information if applicable
-//         if (page && perPage) {
-//             data.pagination = {
-//                 per_page: parseInt(perPage, 10),
-//                 total: total,
-//                 current_page: parseInt(page, 10),
-//                 last_page: Math.ceil(total / perPage),
-//             };
-//         }
-
-//         // Return the response
-//         return res.status(200).json(data);
-//     } catch (error) {
-//         return error500(error, res);
-//     } finally {
-//         if (connection) connection.release();
-//     }
-// };
 
 
 //Get Sold Coin
