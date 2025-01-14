@@ -28,6 +28,7 @@ error500 = (error, res) => {
 
 //add current_price
 const addCurrentPrice = async (req, res) => {
+  const untitledId = req.companyData.untitled_id; 
   let connection;
   try {
     connection = await getConnection();
@@ -36,7 +37,7 @@ const addCurrentPrice = async (req, res) => {
 
     // Fetch all sale_target_id, ticker, and untitled_id from sale_target_header
     const saleTargetQuery = `
-      SELECT sale_target_id, ticker, untitled_id 
+      SELECT sale_target_id, ticker
       FROM sale_target_header 
       WHERE status = 1
     `;
@@ -65,7 +66,7 @@ const addCurrentPrice = async (req, res) => {
 
     // Iterate over all sale_target_data
     for (const saleTarget of saleTargetData) {
-      const { sale_target_id, ticker, untitled_id } = saleTarget;
+      const { sale_target_id, ticker } = saleTarget;
 
       // Fetch the current price for this ticker
       const price = currentPriceData[ticker]?.USD;
@@ -79,11 +80,8 @@ const addCurrentPrice = async (req, res) => {
         `;
         const [checkExistsResult] = await connection.query(checkExistsQuery, [
           ticker,
-          untitled_id,
+          untitledId,
         ]);
-
-        // const currentTimeStamp = new Date().toISOString(); // Current timestamp for `cts`
-        // const status = 1; // Assuming status = 1 for active entries
 
         if (checkExistsResult[0].count > 0) {
           // Update existing record
@@ -94,9 +92,8 @@ const addCurrentPrice = async (req, res) => {
           `;
           await connection.query(updateQuery, [
             price,
-    
             ticker,
-            untitled_id,
+            untitledId,
           ]);
         } else {
           // Insert new record
@@ -108,7 +105,7 @@ const addCurrentPrice = async (req, res) => {
             ticker,
             price,
             sale_target_id,
-            untitled_id
+            untitledId
           ]);
         }
       } 

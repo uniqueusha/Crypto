@@ -62,17 +62,7 @@ app.use('/v1/api/current-price', currentPriceRoute);
 app.get('/health', async (req, res) => {
   res.json("Server is running");
 });
-const baseUrl = 'http://localhost:3000/v1';
-// const baseUrl = 'https://wmdevelopment.co.in:3002/v1/';
-const endpoint = '/api/current-price/add-update';
-setInterval(async () => {
-  try {
-    const response = await axios.post(`${baseUrl}${endpoint}`);
 
-  } catch (error) {
-    // console.error('Error hitting current price endpoint:', error.message);
-  }
-}, 7000);
 
 // Export the app
 module.exports = app;

@@ -13,8 +13,8 @@ router.get('/reached', checkAuth, saleTargetHeaderController.getSetTargetReached
 router.get('/sold-coin', checkAuth, saleTargetHeaderController.getSoldCoin);
 router.get('/:id', checkAuth, saleTargetHeaderController.getSetTarget);
 router.put('/', checkAuth, saleTargetHeaderController.currantPriceUpdateTargetComplitionStatus);
+router.put('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
 router.put('/:id', checkAuth, saleTargetHeaderController.updateSetTarget);
-router.patch('/sell-to-sold', checkAuth, saleTargetHeaderController.updateSellSold);
 router.delete('/:id', checkAuth, saleTargetHeaderController.deleteSetTargetChangeStatus);
 
 module.exports = router
