@@ -236,17 +236,40 @@ const getCoins = async (req, res) => {
             );
         }
 
+        // Calculate the total count based on the filtered data
+        const total = coinsData.length;
+        let coinData = coinsData;
+
+        // Apply pagination to the filtered data
+        if (page && perPage) {
+            const start = (page - 1) * perPage;
+            coinData = coinsData.slice(start, start + parseInt(perPage, 10));
+        }
+
         // Add rank to the paginated data
         coinsData.forEach((coin, index) => {
             coin.Rank = index + 1; // Rank starts at the current page's first item
         });
 
         // Respond with success
-        res.status(200).json({
+        const data = {
             status: 200,
             message: "Coins retrieved successfully!",
-            data:coinsData
-        });
+            data:coinData
+        };
+
+        // Add pagination information if applicable
+        if (page && perPage) {
+            data.pagination = {
+                page: parseInt(page, 10),
+                per_page: parseInt(perPage, 10),
+                total: total,
+                current_page: parseInt(page, 10),
+                last_page: Math.ceil(total / perPage),
+            };
+        }
+
+        return res.status(200).json(data);
     } catch (error) {
         if (connection) await connection.rollback();
         return error500(error, res);
