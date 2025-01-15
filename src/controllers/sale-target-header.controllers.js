@@ -313,7 +313,7 @@ const getSetTargets = async (req, res) => {
         await connection.beginTransaction();
 
         let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} `;
+        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
@@ -351,7 +351,7 @@ const getSetTargets = async (req, res) => {
             LEFT JOIN complition_status cs
             ON cs.complition_id = stf.complition_id 
             WHERE stf.sale_target_id = ${element.sale_target_id} AND
-            stf. untitled_id = ${untitledId} AND stf.status = 1`;
+            stf. untitled_id = ${untitledId}`;
             setFooterResult = await connection.query(setFooterQuery);
             setTarget[i]['footer'] = setFooterResult[0].reverse();
         }
