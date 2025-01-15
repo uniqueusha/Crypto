@@ -351,7 +351,7 @@ const getSetTargets = async (req, res) => {
             LEFT JOIN complition_status cs
             ON cs.complition_id = stf.complition_id 
             WHERE stf.sale_target_id = ${element.sale_target_id} AND
-            stf. untitled_id = ${untitledId}`;
+            stf. untitled_id = ${untitledId} AND stf.status = 1`;
             setFooterResult = await connection.query(setFooterQuery);
             setTarget[i]['footer'] = setFooterResult[0].reverse();
         }
