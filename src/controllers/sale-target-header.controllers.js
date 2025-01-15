@@ -1015,7 +1015,6 @@ const deleteSetTargetChangeStatus = async (req, res) => {
 };
 
 //set target reached list
-
 const getSetTargetReached = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
@@ -1028,38 +1027,21 @@ const getSetTargetReached = async (req, res) => {
         // Base queries
         let getSetTargetQuery = `
             SELECT * FROM sale_target_header 
-            WHERE untitled_id = ${untitledId} AND status = 1`;
-        let countQuery = `
-            SELECT COUNT(*) AS total 
-            FROM sale_target_header 
-            WHERE untitled_id = ${untitledId}`;
+            WHERE untitled_id = ${untitledId} AND status = 1`
 
         // Add search/filtering if a key is provided
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
                 getSetTargetQuery += ` AND status = 1`;
-                countQuery += ` AND status = 1`;
             } else if (lowercaseKey === "deactivated") {
                 getSetTargetQuery += ` AND status = 0`;
-                countQuery += ` AND status = 0`;
             } else {
                 getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-                countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
             }
         }
 
         getSetTargetQuery += " ORDER BY sale_date DESC";
-
-        // Apply pagination if both `page` and `perPage` are provided
-        let total = 0;
-        if (page && perPage) {
-            const totalResult = await connection.query(countQuery);
-            total = parseInt(totalResult[0][0].total);
-
-            const start = (page - 1) * perPage;
-            getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
-        }
 
         // Fetch the header data
         let result = await connection.query(getSetTargetQuery);
@@ -1091,16 +1073,27 @@ const getSetTargetReached = async (req, res) => {
             }
         }
 
+        // Calculate the total count based on the filtered data
+        const total = filteredData.length;
+        let FilteredData = filteredData;
+
+        // Apply pagination to the filtered data
+        if (page && perPage) {
+            const start = (page - 1) * perPage;
+            FilteredData = filteredData.slice(start, start + parseInt(perPage, 10));
+        }
+
         // Build the response object
         const data = {
             status: 200,
             message: "Set Target retrieved successfully",
-            data: filteredData,
+            data: FilteredData,
         };
 
         // Add pagination information if applicable
         if (page && perPage) {
             data.pagination = {
+                page: parseInt(page, 10),
                 per_page: parseInt(perPage, 10),
                 total: total,
                 current_page: parseInt(page, 10),
@@ -1111,13 +1104,13 @@ const getSetTargetReached = async (req, res) => {
         // Return the response
         return res.status(200).json(data);
     } catch (error) {
+        console.log(error);
+        
         return error500(error, res);
     } finally {
         if (connection) connection.release();
     }
 };
-
-
 
 //Get Sold Coin
 const getSoldCoin = async (req, res) => {
