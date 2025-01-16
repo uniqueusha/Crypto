@@ -193,9 +193,9 @@ const createCurrentPrice = async (req, res) => {
         const response = await axios.get(fullUrl);
         const priceRaw = response.data?.[ticker]?.USD;
 
-        if (priceRaw === undefined) {
-            throw new Error("Price data not found for the given ticker in the API response.");
-        }
+        // if (priceRaw === undefined) {
+        //     throw new Error("Price data not found for the given ticker in the API response.");
+        // }
 
         // Handle scientific notation (e.g., 5.1e-8, 5e-10) conversion and regular numbers
         let price = priceRaw;
