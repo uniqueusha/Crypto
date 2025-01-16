@@ -328,7 +328,7 @@ const getSetTargets = async (req, res) => {
                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%' `;
             }
         }
-        // getSetTargetQuery += ` ORDER BY sale_date DESC`;
+        getSetTargetQuery += " ORDER BY sale_date DESC";
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
         // Apply pagination if both page and perPage are provided
@@ -488,88 +488,6 @@ const getSetTargetDownload = async (req, res) => {
     }
 };
 
-// const updateSellSold = async (req, res) => {
-//     const untitledId = req.companyData.untitled_id;
-
-//     let connection = await getConnection();
-//     try {
-//         // Start the transaction
-//         await connection.beginTransaction();
-
-//         // Extract parameters from the request body
-//         const sale_target_id = req.body.sale_target_id || '';
-//         const complition_id = req.body.complition_id || '';
-//         const currant_price = req.body.currant_price ? parseFloat(req.body.currant_price) : null;
-//         const set_footer_id = req.body.set_footer_id || '';
-//         const coin = req.body.coin || '';
-//         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : null;
-
-//         // Fetch current footer details
-//         const setFooterQuery = 
-//         `SELECT * FROM set_target_footer 
-//         WHERE sale_target_id = ? 
-//         AND untitled_id = ? 
-//         AND set_footer_id = ?`;
-
-//         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
-
-//         // Validate if footer data exists
-//         if (footerResult.length === 0) {
-//             return res.status(404).json({ status: 404, message: "Footer data not found." });
-//         }
-
-//         const currentComplitionId = footerResult[0].complition_id;
-
-//         // Log the current and new complition_id for debugging
-//         console.log(`Current complition_id: ${currentComplitionId}, Requested complition_id: ${complition_id}`);
-
-//         // Only proceed if the complition_id is different
-//         if (currentComplitionId !== 4) {
-//             const updateQuery = 
-//             `UPDATE set_target_footer
-//             SET complition_id = ?
-//             WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
-
-//             const [updateResult] = await connection.query(updateQuery, [complition_id, sale_target_id, untitledId, set_footer_id, currentComplitionId]);
-
-//             // Verify if the row was actually updated
-//             if (updateResult.affectedRows === 0) {
-//                 throw new Error("Update failed. The record might have been modified by another transaction.");
-//             }
-
-//             // Handle transitions to or from complition_id = 4
-//             if (currentComplitionId !== 4 && complition_id === 4) {
-//                 // If transitioning to sold state, insert into sold_coin table
-//                 const insertSoldCoinQuery = 
-//                 `INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
-//                 VALUES (?, ?, ?, ?, ?)`;
-
-//                 await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
-
-//                 console.log(`Sold state added for set_footer_id: ${set_footer_id}`);
-//             }
-//         }
-
-//         // Commit the transaction
-//         await connection.commit();
-//         res.status(200).json({
-//             status: 200,
-//             message: "Sell to Sold updated successfully.",
-//         });
-//     } catch (error) {
-//         // Rollback transaction on error
-//         await connection.rollback();
-//         res.status(500).json({
-//             status: 500,
-//             message: "Internal server error.",
-//             error: error.message,
-//         });
-//     } finally {
-//         if (connection) {
-//             connection.release();
-//         }
-//     }
-// };
 
 const updateSellSold = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
@@ -596,19 +514,14 @@ const updateSellSold = async (req, res) => {
             AND set_footer_id = ?`;
         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
         
-
-        // Log the current complition_id from the database
-        const currentComplitionId = footerResult[0].complition_id;
-        
-        
-        // Only allow transitions from `complition_id = 3`
-        if (currentComplitionId === 3) {
+        // Only allow transitions from `complition_id = 3` 
+        if (complition_id == 3) {
             const updateQuery = `
                 UPDATE set_target_footer
                 SET complition_id = 4
                 WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
-            const [updateResult] = await connection.query(updateQuery, [sale_target_id, untitledId, set_footer_id]);
-          
+            const [updateResult] =await connection.query(updateQuery, [sale_target_id, untitledId, set_footer_id]);
+            
             // Insert into `sold_coin` table
             const insertSoldCoinQuery = `
                 INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
@@ -623,12 +536,8 @@ const updateSellSold = async (req, res) => {
             message: "Sell to Sold updated successfully.",
         });
     } catch (error) {
-        console.error("Error:", error.message);
-
         // Rollback transaction on error
-        if (connection) {
-            await connection.rollback();
-        }
+        if (connection) await connection.rollback();
 
         res.status(500).json({
             status: 500,
@@ -645,7 +554,6 @@ const updateSellSold = async (req, res) => {
 //count set target
 const getSetTargetCount = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
-    // const { created_at, user_id } = req.query;
     // Attempt to obtain a database connection
     let connection = await getConnection();
 
