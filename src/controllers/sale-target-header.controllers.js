@@ -3,6 +3,7 @@ const axios = require('axios');
 const xlsx = require('xlsx');
 const fs = require('fs');
 const { log } = require("console");
+
 // Function to obtain a database connection
 const getConnection = async () => {
     try {
@@ -36,10 +37,13 @@ const addSaleTargetHeader = async (req, res) => {
     const coin = req.body.coin ? req.body.coin : '';
     const base_price = req.body.base_price ? req.body.base_price : '';
     const currant_price = req.body.currant_price ? req.body.currant_price : '';
+    const current_return_x = req.body.current_return_x ? req.body.current_return_x : '';
     const market_cap = req.body.market_cap ? req.body.market_cap : '';
     const return_x = req.body.return_x ? req.body.return_x : '';
     const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price : '';
     const available_coins = req.body.available_coins ? req.body.available_coins : '';
+    const timeframe = req.body.timeframe ? req.body.timeframe : '';
+    const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : '';
     const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
     if (!coin) {
@@ -65,8 +69,8 @@ const addSaleTargetHeader = async (req, res) => {
         await connection.beginTransaction();
         // let final_sale_price = base_price * return_x;
 
-        const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header ( ticker, coin, base_price, currant_price, market_cap, return_x, final_sale_price, available_coins, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        const insertSaleTargetHeaderValue = [ticker, coin, base_price, currant_price, market_cap, return_x, final_sale_price, available_coins, untitled_id];
+        const insertSaleTargetHeaderQuery = "INSERT INTO sale_target_header ( ticker, coin, base_price, currant_price, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        const insertSaleTargetHeaderValue = [ticker, coin, base_price, currant_price, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id];
         const insertSaleTargetHeaderResult = await connection.query(insertSaleTargetHeaderQuery, insertSaleTargetHeaderValue);
         const sale_target_id = insertSaleTargetHeaderResult[0].insertId
 
@@ -193,10 +197,6 @@ const createCurrentPrice = async (req, res) => {
         const response = await axios.get(fullUrl);
         const priceRaw = response.data?.[ticker]?.USD;
 
-        // if (priceRaw === undefined) {
-        //     throw new Error("Price data not found for the given ticker in the API response.");
-        // }
-
         // Handle scientific notation (e.g., 5.1e-8, 5e-10) conversion and regular numbers
         let price = priceRaw;
 
@@ -207,6 +207,14 @@ const createCurrentPrice = async (req, res) => {
             price = priceRaw.toString(); // If not in scientific notation, keep as-is
         }
 
+        //FDV
+        const responses = await axios.get(
+            `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
+        )
+
+        let supply = responses.data.Data[0].ConversionInfo.Supply;
+        let FDV = (price/supply).toFixed(10);
+        
         // Commit the transaction
         await connection.commit();
 
@@ -214,10 +222,9 @@ const createCurrentPrice = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Fetch Current Price successfully",
-            data: { currentPrice: price },
+            data: { currentPrice: price,FDV},
         });
     } catch (error) {
-        console.error(error);
         if (connection) await connection.rollback();
         return error500(error, res);
     } finally {
@@ -590,10 +597,13 @@ const updateSetTarget = async (req, res) => {
     const coin = req.body.coin ? req.body.coin : '';
     const base_price = req.body.base_price ? req.body.base_price : '';
     const currant_price = req.body.currant_price ? req.body.currant_price : '';
+    const current_return_x = req.body.current_return_x ? req.body.current_return_x : '';
     const market_cap = req.body.market_cap ? req.body.market_cap : '';
     const return_x = req.body.return_x ? req.body.return_x : '';
     const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price : '';
     const available_coins = req.body.available_coins ? req.body.available_coins : '';
+    const timeframe = req.body.timeframe ? req.body.timeframe : '';
+    const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : '';
     const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
     if (!coin) {
@@ -620,8 +630,8 @@ const updateSetTarget = async (req, res) => {
         // let final_sale_price = base_price * return_x;
 
         // Update Task Heater
-        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ? WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, market_cap, return_x, final_sale_price, available_coins, sale_target_id, untitled_id]);
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, current_return_x ,market_cap, return_x, final_sale_price, available_coins, timeframe, sale_target_id, fdv_ratio, untitled_id]);
 
         //update into sale target header
         let setTargetFooterArray = setTargetFooter.reverse();
@@ -893,8 +903,6 @@ const getSetTargetReached = async (req, res) => {
         // Return the response
         return res.status(200).json(data);
     } catch (error) {
-        console.log(error);
-        
         return error500(error, res);
     } finally {
         if (connection) connection.release();
@@ -960,7 +968,6 @@ const getSoldCoin = async (req, res) => {
                 last_page: Math.ceil(total / perPage),
             };
         }
-
         return res.status(200).json(data);
     } catch (error) {
         return error500(error, res);
@@ -968,6 +975,42 @@ const getSoldCoin = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
+//current price 
+const getCurrentPriceCount = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        let current_count = 0;
+
+        let setCurrentCountQuery = `SELECT SUM(currant_price) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1 `;
+        let setCurrentCountResult = await connection.query(setCurrentCountQuery);
+        current_count = parseFloat(setCurrentCountResult[0][0].total);
+
+        const data = {
+            status: 200,
+            message: "Set Target Count retrieved successfully",
+            current_count: current_count
+        };
+
+        return res.status(200).json(data);
+    } catch (error) {
+        return error500(error, res);
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
+
+
+
 
 module.exports = {
     addSaleTargetHeader,
@@ -981,5 +1024,6 @@ module.exports = {
     getSetTarget,
     deleteSetTargetChangeStatus,
     getSetTargetReached,
-    getSoldCoin
+    getSoldCoin,
+    getCurrentPriceCount
 }

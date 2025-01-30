@@ -203,7 +203,6 @@ const getCoins = async (req, res) => {
             const coinInfo = rawData[index].CoinInfo;
             const displayData = rawData[index].DISPLAY?.USD; 
             
-            
             let coinDetails = {};
             
             if (coinInfo) {   
@@ -547,7 +546,7 @@ const getCoinActiveCurrentPrice = async (req, res) => {
 
                         // Construct the URL dynamically for each tricker
                         const fullUrl = `${apiSetting.url}${apiSetting.tricker}${apiSetting.currency_name}`;
-                        console.log('Request URL:', fullUrl);
+                        
 
                         try {
                             // Make the API call to fetch the current price
