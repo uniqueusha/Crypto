@@ -255,20 +255,28 @@ const addCurrentPrice = async (req, res) => {
 //current price list
 const getCurrentprice = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
-  // Attempt to obtain a database connection
-  let connection = await getConnection();
+  let connection;
+
   try {
+    connection = await getConnection();
     await connection.beginTransaction();
 
-    let getCurrentpriceQuery = `SELECT * FROM current_price WHERE untitled_id = ${untitledId} AND status = 1`;
+    // Fetch current price records and calculate the total of current_value
+    const getCurrentpriceQuery = `
+      SELECT *, SUM(current_value) AS totalCurrentValue 
+      FROM current_price 
+      WHERE untitled_id = ? AND status = 1
+    `;
 
-    const result = await connection.query(getCurrentpriceQuery);
-    const currentPrice = result[0];
+    const [result] = await connection.query(getCurrentpriceQuery, [untitledId]);
+    const currentPriceData = result;
 
+    // Prepare response data
     const data = {
       status: 200,
       message: "Current Price retrieved successfully",
-      data: currentPrice,
+      totalCurrentValue: currentPriceData[0]?.totalCurrentValue || 0,
+      data: currentPriceData,
     };
 
     return res.status(200).json(data);
@@ -278,6 +286,7 @@ const getCurrentprice = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
 
 module.exports = {
   addCurrentPrice,
