@@ -127,15 +127,16 @@ error500 = (error, res) => {
 //   }
 // };
 const addCurrentPrice = async (req, res) => {
-  const untitledId = req.companyData.untitled_id; 
+  const untitledId = req.companyData.untitled_id;
   let connection;
+
   try {
     connection = await getConnection();
     await connection.beginTransaction();
 
-    // Fetch all sale_target_id, ticker, and untitled_id from sale_target_header
+    // Fetch all sale_target_id, ticker, base_price, and available_coins
     const saleTargetQuery = `
-      SELECT sale_target_id, ticker
+      SELECT sale_target_id, ticker, base_price, available_coins 
       FROM sale_target_header 
       WHERE status = 1
     `;
@@ -164,19 +165,26 @@ const addCurrentPrice = async (req, res) => {
 
     // Iterate over all sale_target_data
     for (const saleTarget of saleTargetData) {
-      const { sale_target_id, ticker } = saleTarget;
+      const { sale_target_id, ticker, base_price, available_coins } = saleTarget;
 
       // Fetch the current price for this ticker
       const price = currentPriceData[ticker]?.USD;
 
       if (price) {
+        // Calculate current_return_x (current_price / base_price)
+        const current_return_x = base_price > 0 ? price / base_price : 0;
+
         // Fetch supply data for FDV calculation
         const responses = await axios.get(
           `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
         );
 
         const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
-        const fdv_ratio = (price / supply); // No rounding/truncation, use as is
+        const fdv_ratio = price / supply;
+
+        // Calculate current_value = current_price * available_coins
+        const current_value = price * available_coins;
+
         // Check if the combination of ticker and untitled_id already exists
         const checkExistsQuery = `
           SELECT COUNT(*) AS count 
@@ -189,33 +197,37 @@ const addCurrentPrice = async (req, res) => {
         ]);
 
         if (checkExistsResult[0].count > 0) {
-          // Update existing record with current_price and fdv_ratio
+          // Update existing record with current_price, fdv_ratio, current_return_x, and current_value
           const updateQuery = `
             UPDATE current_price 
-            SET current_price = ?, fdv_ratio = ? 
+            SET current_price = ?, fdv_ratio = ?, current_return_x = ?, current_value = ? 
             WHERE ticker = ? AND untitled_id = ?
           `;
           await connection.query(updateQuery, [
             price,
-            fdv_ratio, // Store FDV ratio as it is
+            fdv_ratio,
+            current_return_x,
+            current_value,
             ticker,
             untitledId,
           ]);
         } else {
-          // Insert new record with current_price and fdv_ratio
+          // Insert new record with current_price, fdv_ratio, current_return_x, and current_value
           const insertQuery = `
-            INSERT INTO current_price (ticker, current_price, fdv_ratio, sale_target_id, untitled_id) 
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO current_price (ticker, current_price, fdv_ratio, current_return_x, current_value, sale_target_id, untitled_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
           `;
           await connection.query(insertQuery, [
             ticker,
             price,
-            fdv_ratio, // Store FDV ratio as it is
+            fdv_ratio,
+            current_return_x,
+            current_value,
             sale_target_id,
             untitledId
           ]);
         }
-      } 
+      }
     }
 
     // Commit the transaction
@@ -224,7 +236,7 @@ const addCurrentPrice = async (req, res) => {
     // Respond with success message
     res.status(200).json({
       status: 200,
-      message: `All sale_target_id entries with their untitled_id have been successfully added/updated in the current_price table with fdv_ratio.`,
+      message: `All sale_target_id entries with their untitled_id have been successfully added/updated in the current_price table with fdv_ratio, current_return_x, and current_value.`,
     });
   } catch (error) {
     if (connection) await connection.rollback();
@@ -233,6 +245,7 @@ const addCurrentPrice = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
 
 
 
