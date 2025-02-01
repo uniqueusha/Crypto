@@ -261,31 +261,36 @@ const getCurrentprice = async (req, res) => {
     connection = await getConnection();
     await connection.beginTransaction();
 
-    // Fetch current price records and calculate the total of current_value
+    // Fetch the sum of current_value
     const getCurrentpriceQuery = `
-      SELECT *, SUM(current_value) AS totalCurrentValue 
+      SELECT SUM(current_value) AS totalCurrentValue 
       FROM current_price 
       WHERE untitled_id = ? AND status = 1
     `;
-
     const [result] = await connection.query(getCurrentpriceQuery, [untitledId]);
-    const currentPriceData = result;
 
     // Prepare response data
+    const totalCurrentValue = result[0]?.totalCurrentValue || 0;
     const data = {
       status: 200,
       message: "Current Price retrieved successfully",
-      totalCurrentValue: currentPriceData[0]?.totalCurrentValue || 0,
-      data: currentPriceData,
+      totalCurrentValue,
     };
+
+    // Commit the transaction
+    await connection.commit();
 
     return res.status(200).json(data);
   } catch (error) {
+    // If there's an error, rollback the transaction
+    if (connection) await connection.rollback();
     return error500(error, res);
   } finally {
     if (connection) connection.release();
   }
 };
+
+
 
 
 module.exports = {
