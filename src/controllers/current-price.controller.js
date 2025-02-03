@@ -214,12 +214,12 @@ const addCurrentPrice = async (req, res) => {
           // Insert new record with current_price, fdv_ratio, current_return_x, and current_value
           const insertQuery = `
             INSERT INTO current_price (ticker, current_price, current_return_x, current_value, sale_target_id, untitled_id) 
-            VALUES (?, ?, ?, ?, ?, ?, )
+            VALUES (?, ?, ?, ?, ?, ?)
           `;
           await connection.query(insertQuery, [
             ticker,
             price,
-            fdv_ratio,
+            
             current_return_x,
             current_value,
             sale_target_id,
