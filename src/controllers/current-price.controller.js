@@ -138,7 +138,7 @@ const addCurrentPrice = async (req, res) => {
     const saleTargetQuery = `
       SELECT sale_target_id, ticker, base_price, available_coins 
       FROM sale_target_header 
-      WHERE status = 1
+      WHERE untitled_id = ${untitledId} 
     `;
     const saleTargetResult = await connection.query(saleTargetQuery);
 
@@ -254,9 +254,11 @@ const addCurrentPrice = async (req, res) => {
     // Respond with success message
     res.status(200).json({
       status: 200,
-      message: `All sale_target_id entries with their untitled_id have been successfully added/updated in the current_price table with fdv_ratio, current_return_x, and current_value.`,
+      message: `All current price added/updated successfully .`,
     });
   } catch (error) {
+    console.log(error);
+    
     if (connection) await connection.rollback();
     return error500(error, res);
   } finally {
