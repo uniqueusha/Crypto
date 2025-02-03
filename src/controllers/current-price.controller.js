@@ -273,7 +273,6 @@ const getCurrentprice = async (req, res) => {
     ]);
 
     const totalCurrentValue = totalValueResult[0]?.totalCurrentValue || 0;
-console.log(totalCurrentValue);
 
     // Prepare response data
     const data = {
