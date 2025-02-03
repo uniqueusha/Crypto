@@ -124,7 +124,7 @@ const addSaleTargetHeader = async (req, res) => {
     const final_sale_price = parseFloat(req.body.final_sale_price) || 0;
     const available_coins = parseFloat(req.body.available_coins) || 0;
     const timeframe = req.body.timeframe || '';
-    const fdv_ratio = req.body.fdv_ratio || '';
+    // const fdv_ratio = req.body.fdv_ratio || '';
     const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
 
@@ -155,12 +155,12 @@ const addSaleTargetHeader = async (req, res) => {
         const insertSaleTargetHeaderQuery = `
             INSERT INTO sale_target_header (
                 ticker, coin, base_price, currant_price, current_value, current_return_x,
-                market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                market_cap, return_x, final_sale_price, available_coins, timeframe, untitled_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         const insertSaleTargetHeaderValues = [
             ticker, coin, base_price, currant_price, current_value, current_return_x,
-            market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
+            market_cap, return_x, final_sale_price, available_coins, timeframe, untitled_id
         ];
 
         const [insertSaleTargetHeaderResult] = await connection.query(insertSaleTargetHeaderQuery, insertSaleTargetHeaderValues);
@@ -304,12 +304,12 @@ const createCurrentPrice = async (req, res) => {
         }
 
         //FDV
-        const responses = await axios.get(
-            `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
-        )
+        // const responses = await axios.get(
+        //     `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
+        // )
 
-        let supply = responses.data.Data[0].ConversionInfo.Supply;
-        let FDV = (price/supply).toFixed(10);
+        // let supply = responses.data.Data[0].ConversionInfo.Supply;
+        // let FDV = (price/supply).toFixed(10);
 
         const mktResponse = await axios.get(
             `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
@@ -339,7 +339,7 @@ const createCurrentPrice = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Fetch Current Price successfully",
-            data: { currentPrice: price,FDV,mktcap},
+            data: { currentPrice: price,mktcap},
         });
     } catch (error) {
         if (connection) await connection.rollback();
@@ -722,7 +722,7 @@ const updateSetTarget = async (req, res) => {
     const final_sale_price = req.body.final_sale_price ? req.body.final_sale_price : '';
     const available_coins = req.body.available_coins ? req.body.available_coins : '';
     const timeframe = req.body.timeframe ? req.body.timeframe : '';
-    const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : '';
+    // const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : '';
     const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
     if (!coin) {
@@ -748,8 +748,8 @@ const updateSetTarget = async (req, res) => {
         await connection.beginTransaction();
 
         // Update Sale Target Header
-        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ? WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, sale_target_id, untitled_id]);
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, sale_target_id, untitled_id]);
 
         // Update set target footer
         let setTargetFooterArray = setTargetFooter.reverse();
