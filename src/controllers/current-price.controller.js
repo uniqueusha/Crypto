@@ -138,7 +138,7 @@ const addCurrentPrice = async (req, res) => {
     const saleTargetQuery = `
       SELECT sale_target_id, ticker, base_price, available_coins 
       FROM sale_target_header 
-      WHERE untitled_id = ${untitledId} 
+      WHERE untitled_id = ${untitledId}
     `;
     const saleTargetResult = await connection.query(saleTargetQuery);
 
@@ -181,7 +181,26 @@ const addCurrentPrice = async (req, res) => {
 
         // const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
         // const fdv_ratio = price / supply;
+const fdv_ratio = 0;
+const mktResponse = await axios.get(
+  `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+);
 
+// market cap
+let mktcap = null;
+if (mktResponse.data && mktResponse.data.Data) {
+  //ticker
+  const coinData = mktResponse.data.Data.find(
+      (coin) => coin.CoinInfo.Name === ticker
+  );
+
+  if (coinData && coinData.RAW && coinData.RAW.USD) {
+      mktcap = coinData.RAW.USD.MKTCAP;
+      // console.log(`Market Cap of ${ticker}: $${mktcap}`);
+  } else {
+      // console.log(`Market Cap data for ${ticker} is not available.`);
+  }
+} 
         // Calculate current_value = current_price * available_coins
         const current_value = price * available_coins;
 
@@ -200,12 +219,14 @@ const addCurrentPrice = async (req, res) => {
           // Update existing record with current_price, fdv_ratio, current_return_x, and current_value
           const updateQuery = `
             UPDATE current_price 
-            SET current_price = ?, current_return_x = ?, current_value = ? 
+            SET current_price = ?, current_return_x = ?, fdv_ratio = ?, market_cap = ?, current_value = ? 
             WHERE ticker = ? AND untitled_id = ?
           `;
           await connection.query(updateQuery, [
             price,
             current_return_x,
+            fdv_ratio,
+            mktcap,
             current_value,
             ticker,
             untitledId,
@@ -213,38 +234,21 @@ const addCurrentPrice = async (req, res) => {
         } else {
           // Insert new record with current_price, fdv_ratio, current_return_x, and current_value
           const insertQuery = `
-            INSERT INTO current_price (ticker, current_price, current_return_x, current_value, sale_target_id, untitled_id) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO current_price (ticker, current_price, current_return_x, fdv_ratio, market_cap, current_value, sale_target_id, untitled_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `;
           await connection.query(insertQuery, [
             ticker,
             price,
-            
             current_return_x,
+            fdv_ratio,
+            mktcap,
             current_value,
             sale_target_id,
             untitledId
           ]);
         }
-        const mktResponse = await axios.get(
-                    `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
-                );
         
-                // market cap
-                let mktcap = null;
-                if (mktResponse.data && mktResponse.data.Data) {
-                    //ticker
-                    const coinData = mktResponse.data.Data.find(
-                        (coin) => coin.CoinInfo.Name === ticker
-                    );
-        
-                    if (coinData && coinData.RAW && coinData.RAW.USD) {
-                        mktcap = coinData.RAW.USD.MKTCAP;
-                        // console.log(`Market Cap of ${ticker}: $${mktcap}`);
-                    } else {
-                        // console.log(`Market Cap data for ${ticker} is not available.`);
-                    }
-                } 
       }
     }
 
@@ -254,7 +258,7 @@ const addCurrentPrice = async (req, res) => {
     // Respond with success message
     res.status(200).json({
       status: 200,
-      message: `All current price added/updated successfully .`,
+      message: `All current price  added/updated successfully .`,
     });
   } catch (error) {
     console.log(error);
