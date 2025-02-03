@@ -174,13 +174,13 @@ const addCurrentPrice = async (req, res) => {
         // Calculate current_return_x (current_price / base_price)
         const current_return_x = base_price > 0 ? price / base_price : 0;
 
-        // Fetch supply data for FDV calculation
-        const responses = await axios.get(
-          `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
-        );
+        // // Fetch supply data for FDV calculation
+        // const responses = await axios.get(
+        //   `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
+        // );
 
-        const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
-        const fdv_ratio = price / supply;
+        // const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
+        // const fdv_ratio = price / supply;
 
         // Calculate current_value = current_price * available_coins
         const current_value = price * available_coins;
@@ -200,12 +200,11 @@ const addCurrentPrice = async (req, res) => {
           // Update existing record with current_price, fdv_ratio, current_return_x, and current_value
           const updateQuery = `
             UPDATE current_price 
-            SET current_price = ?, fdv_ratio = ?, current_return_x = ?, current_value = ? 
+            SET current_price = ?, current_return_x = ?, current_value = ? 
             WHERE ticker = ? AND untitled_id = ?
           `;
           await connection.query(updateQuery, [
             price,
-            fdv_ratio,
             current_return_x,
             current_value,
             ticker,
@@ -214,8 +213,8 @@ const addCurrentPrice = async (req, res) => {
         } else {
           // Insert new record with current_price, fdv_ratio, current_return_x, and current_value
           const insertQuery = `
-            INSERT INTO current_price (ticker, current_price, fdv_ratio, current_return_x, current_value, sale_target_id, untitled_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO current_price (ticker, current_price, current_return_x, current_value, sale_target_id, untitled_id) 
+            VALUES (?, ?, ?, ?, ?, ?, )
           `;
           await connection.query(insertQuery, [
             ticker,
