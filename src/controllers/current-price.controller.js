@@ -246,41 +246,48 @@ const addCurrentPrice = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 //current price list
 const getCurrentprice = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   let connection;
-
   try {
     connection = await getConnection();
     await connection.beginTransaction();
-
-    // Fetch current price records and calculate the total of current_value
-    const getCurrentpriceQuery = `
-      SELECT *, SUM(current_value) AS totalCurrentValue 
+    // Fetch the total current value
+    const getTotalCurrentValueQuery = `
+      SELECT SUM(current_value) AS totalCurrentValue 
       FROM current_price 
       WHERE untitled_id = ? AND status = 1
     `;
 
-    const [result] = await connection.query(getCurrentpriceQuery, [untitledId]);
-    const currentPriceData = result;
+    const [totalValueResult] = await connection.query(
+      getTotalCurrentValueQuery,
+      [untitledId]
+    );
+    // Fetch all columns
+    const getCurrentPriceDetailsQuery = `
+      SELECT * FROM current_price  WHERE untitled_id = ? AND status = 1
+    `;
+    const [priceDetails] = await connection.query(getCurrentPriceDetailsQuery, [
+      untitledId,
+    ]);
+
+    const totalCurrentValue = totalValueResult[0]?.totalCurrentValue || 0;
 
     // Prepare response data
     const data = {
       status: 200,
-      message: "Current Price retrieved successfully",
-      totalCurrentValue: currentPriceData[0]?.totalCurrentValue || 0,
-      data: currentPriceData,
+      message: "Current Price  Retrieved Successfully",
+      totalCurrentValue,
+      data: priceDetails,
     };
+
+    // Commit the transaction
+    await connection.commit();
 
     return res.status(200).json(data);
   } catch (error) {
+    if (connection) await connection.rollback();
     return error500(error, res);
   } finally {
     if (connection) connection.release();
