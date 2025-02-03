@@ -201,7 +201,10 @@ const getCoins = async (req, res) => {
         // Loop through the data to log CoinInfo and DISPLAY information
         for (let index = 0; index < rawData.length; index++) {
             const coinInfo = rawData[index].CoinInfo;
-            const displayData = rawData[index].DISPLAY?.USD; 
+            const displayData = rawData[index].DISPLAY?.USD;
+            const raw =  rawData[index].RAW?.USD;
+            
+            
             
             let coinDetails = {};
             
@@ -225,7 +228,11 @@ const getCoins = async (req, res) => {
                 coinDetails.one24h = one24H.toFixed(3);
 
             coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
-            coinDetails.MKTCAP = displayData.MKTCAP;
+            // coinDetails.MKTCAP = raw.MKTCAP;
+            }
+            
+            if (raw) {
+                coinDetails.MKTCAP = raw.MKTCAP;
             }
             coinsData.push(coinDetails);  
         }

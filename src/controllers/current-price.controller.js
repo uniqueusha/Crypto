@@ -227,6 +227,25 @@ const addCurrentPrice = async (req, res) => {
             untitledId
           ]);
         }
+        const mktResponse = await axios.get(
+                    `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+                );
+        
+                // market cap
+                let mktcap = null;
+                if (mktResponse.data && mktResponse.data.Data) {
+                    //ticker
+                    const coinData = mktResponse.data.Data.find(
+                        (coin) => coin.CoinInfo.Name === ticker
+                    );
+        
+                    if (coinData && coinData.RAW && coinData.RAW.USD) {
+                        mktcap = coinData.RAW.USD.MKTCAP;
+                        console.log(`Market Cap of ${ticker}: $${mktcap}`);
+                    } else {
+                        console.log(`Market Cap data for ${ticker} is not available.`);
+                    }
+                } 
       }
     }
 
