@@ -241,9 +241,9 @@ const addCurrentPrice = async (req, res) => {
         
                     if (coinData && coinData.RAW && coinData.RAW.USD) {
                         mktcap = coinData.RAW.USD.MKTCAP;
-                        console.log(`Market Cap of ${ticker}: $${mktcap}`);
+                        // console.log(`Market Cap of ${ticker}: $${mktcap}`);
                     } else {
-                        console.log(`Market Cap data for ${ticker} is not available.`);
+                        // console.log(`Market Cap data for ${ticker} is not available.`);
                     }
                 } 
       }
@@ -266,23 +266,90 @@ const addCurrentPrice = async (req, res) => {
 };
 
 //current price list
+// const getCurrentprice = async (req, res) => {
+//   const untitledId = req.companyData.untitled_id;
+//   let connection;
+//   try {
+//     connection = await getConnection();
+//     await connection.beginTransaction();
+//     // Fetch the total current value
+    
+//     const getTotalCurrentValueQuery = `
+//       SELECT SUM(current_value) AS totalCurrentValue 
+//       FROM current_price 
+//       WHERE untitled_id = ? AND status = 1
+//     `;
+
+//     const [totalValueResult] = await connection.query(
+//       getTotalCurrentValueQuery,
+//       [untitledId]
+//     );
+//     // Fetch all columns
+//     const getCurrentPriceDetailsQuery = `
+//       SELECT * FROM current_price  WHERE untitled_id = ? AND status = 1
+//     `;
+//     const [priceDetails] = await connection.query(getCurrentPriceDetailsQuery, [
+//       untitledId,
+//     ]);
+
+//     const totalCurrentValue = totalValueResult[0]?.totalCurrentValue || 0;
+
+//     // Prepare response data
+//     const data = {
+//       status: 200,
+//       message: "Current Price  Retrieved Successfully",
+//       totalCurrentValue,
+//       data: priceDetails,
+//     };
+
+//     // Commit the transaction
+//     await connection.commit();
+
+//     return res.status(200).json(data);
+//   } catch (error) {
+//     if (connection) await connection.rollback();
+//     return error500(error, res);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+
 const getCurrentprice = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   let connection;
   try {
     connection = await getConnection();
     await connection.beginTransaction();
-    // Fetch the total current value
     const getTotalCurrentValueQuery = `
-      SELECT SUM(current_value) AS totalCurrentValue 
-      FROM current_price 
-      WHERE untitled_id = ? AND status = 1
-    `;
+  SELECT 
+  total_value, 
+  ticker, 
+  untitled_id, 
+  SUM(total_value) OVER () AS totalCurrentValue
+FROM (
+  SELECT current_value AS total_value, ticker, untitled_id
+  FROM current_price
+  WHERE untitled_id = ? AND status = 1
 
-    const [totalValueResult] = await connection.query(
-      getTotalCurrentValueQuery,
-      [untitledId]
-    );
+  UNION ALL
+
+  SELECT sth.current_value, sth.ticker, sth.untitled_id
+  FROM sale_target_header sth
+  WHERE sth.untitled_id = ? AND sth.status = 1
+  AND NOT EXISTS (
+    SELECT 1 
+    FROM current_price cp
+    WHERE cp.untitled_id = sth.untitled_id 
+    AND cp.ticker = sth.ticker
+  )
+) AS combined_values
+  `;
+  
+  const [totalValueResult] = await connection.query(
+    getTotalCurrentValueQuery,
+    [untitledId, untitledId]
+  );
+  
     // Fetch all columns
     const getCurrentPriceDetailsQuery = `
       SELECT * FROM current_price  WHERE untitled_id = ? AND status = 1
@@ -312,6 +379,10 @@ const getCurrentprice = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
+
+
+
 
 
 module.exports = {
