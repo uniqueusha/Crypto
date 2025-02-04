@@ -170,7 +170,6 @@ if (mktResponse.data && mktResponse.data.Data) {
   }
 };
 
-
 const getCurrentprice = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   let connection;
@@ -178,26 +177,44 @@ const getCurrentprice = async (req, res) => {
     connection = await getConnection();
     await connection.beginTransaction();
 
-    // Fetch the total current value from both tables
+    // Updated totalCurrentValue query
     const getTotalCurrentValueQuery = `
-      SELECT 
-        (COALESCE(SUM(cp.current_value), 0) + COALESCE(SUM(sth.current_value), 0)) AS totalCurrentValue
-      FROM current_price cp
-      LEFT JOIN sale_target_header sth 
-        ON cp.untitled_id = sth.untitled_id 
-        AND cp.sale_target_id != sth.sale_target_id
-      WHERE cp.untitled_id = ? 
-        AND cp.status = 1 
-        AND sth.status = 1
+      SELECT (
+        COALESCE(
+          (SELECT SUM(current_value) 
+           FROM current_price 
+           WHERE untitled_id = ? AND status = 1),
+          0
+        ) 
+        + 
+        COALESCE(
+          (SELECT SUM(sh.current_value)
+           FROM sale_target_header sh
+           WHERE NOT EXISTS (
+             SELECT 1 
+             FROM current_price c 
+             WHERE c.ticker = sh.ticker
+           ) 
+           AND sh.untitled_id = ? AND sh.status = 1),
+          0
+        )
+      ) AS totalCurrentValue
     `;
 
-    const [totalValueResult] = await connection.query(getTotalCurrentValueQuery, [untitledId]);
+    const [totalValueResult] = await connection.query(
+      getTotalCurrentValueQuery,
+      [untitledId, untitledId]
+    );
 
-    // Fetch all columns from current_price table
+    // Fetch all columns
     const getCurrentPriceDetailsQuery = `
-      SELECT * FROM current_price WHERE untitled_id = ? AND status = 1
+      SELECT * 
+      FROM current_price  
+      WHERE untitled_id = ? AND status = 1
     `;
-    const [priceDetails] = await connection.query(getCurrentPriceDetailsQuery, [untitledId]);
+    const [priceDetails] = await connection.query(getCurrentPriceDetailsQuery, [
+      untitledId,
+    ]);
 
     const totalCurrentValue = totalValueResult[0]?.totalCurrentValue || 0;
 
@@ -220,6 +237,7 @@ const getCurrentprice = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
 
 
 
