@@ -35,10 +35,10 @@ const addCurrentPrice = async (req, res) => {
     await connection.beginTransaction();
 
     // Fetch all sale_target_id, ticker, base_price, and available_coins
-    const saleTargetQuery = `
+    let saleTargetQuery = `
       SELECT sale_target_id, ticker, base_price, available_coins 
       FROM sale_target_header 
-      WHERE untitled_id = ${untitledId}
+      WHERE untitled_id = ${untitledId} AND status = 1
     `;
     const saleTargetResult = await connection.query(saleTargetQuery);
 
