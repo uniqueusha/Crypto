@@ -81,13 +81,14 @@ const addCurrentPrice = async (req, res) => {
 
         // const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
         // const fdv_ratio = price / supply;
-const fdv_ratio = 0;
+
 const mktResponse = await axios.get(
   `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
 );
 
 // market cap
 let mktcap = null;
+let fdv_ratio = null;
 if (mktResponse.data && mktResponse.data.Data) {
   //ticker
   const coinData = mktResponse.data.Data.find(
@@ -95,7 +96,8 @@ if (mktResponse.data && mktResponse.data.Data) {
   );
 
   if (coinData && coinData.RAW && coinData.RAW.USD) {
-      mktcap = coinData.RAW.USD.MKTCAP;
+                fdv_ratio  = coinData.RAW.USD.CIRCULATINGSUPPLY / coinData.RAW.USD.SUPPLY;
+                mktcap = fdv_ratio * coinData.RAW.USD.MKTCAP;
       // console.log(`Market Cap of ${ticker}: $${mktcap}`);
   } else {
       // console.log(`Market Cap data for ${ticker} is not available.`);

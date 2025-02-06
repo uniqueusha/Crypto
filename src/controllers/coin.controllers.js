@@ -187,102 +187,205 @@ const addCoin = async (req, res)=>{
 // };
 
 
+// const getCoins = async (req, res) => {
+//     const { page, perPage, key } = req.query;
+//     let connection;
+//     try {
+//         connection = await pool.getConnection();
+//         let response = await axios.get(
+//             `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+//         );
+//         let rawData = response.data.Data;
+//         let coinsData = [];
+        
+//         // Loop through the data to log CoinInfo and DISPLAY information
+//         for (let index = 0; index < rawData.length; index++) {
+//             const coinInfo = rawData[index].CoinInfo;
+//             const displayData = rawData[index].DISPLAY?.USD;
+//             const raw =  rawData[index].RAW?.USD;
+            
+            
+            
+//             let coinDetails = {};
+            
+//             if (coinInfo) {   
+//                 coinDetails.ImageUrl = coinInfo.ImageUrl; 
+//                 coinDetails.FullName = coinInfo.FullName;
+//                 coinDetails.Name = coinInfo.Name;
+//             }
+            
+//             if (displayData) {
+//                 coinDetails.PRICE = displayData.PRICE
+//                 const price = displayData.PRICE.replace(/[^0-9.-]+/g, "");
+//                 const openHour = displayData.OPENHOUR.replace(/[^0-9.-]+/g, "");
+//                 const open24HOUR = displayData.OPEN24HOUR.replace(/[^0-9.-]+/g, "");
+//                 coinDetails.OPENHOUR = displayData.OPENHOUR
+//                 let oneH = ((price - openHour) / openHour) * 100;
+//                 let one24H = ((price - open24HOUR) / open24HOUR) * 100;
+                
+//                 coinDetails.oneh = oneH.toFixed(3);
+//                 coinDetails.OPEN24HOUR = displayData.OPEN24HOUR;
+//                 coinDetails.one24h = one24H.toFixed(3);
+
+//             coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
+//             // coinDetails.MKTCAP = raw.MKTCAP;
+//             }
+            
+//             if (raw) {
+//                 coinDetails.MKTCAP = raw.MKTCAP;
+//             }
+//             coinsData.push(coinDetails);  
+//         }
+//         if (key) {
+//             coinsData = coinsData.filter((coin) =>
+//                 coin.FullName?.toLowerCase().includes(key.toLowerCase())
+//             );
+//         }
+
+//         // Calculate the total count based on the filtered data
+//         const total = coinsData.length;
+//         let coinData = coinsData;
+
+//         // Apply pagination to the filtered data
+//         if (page && perPage) {
+//             const start = (page - 1) * perPage;
+//             coinData = coinsData.slice(start, start + parseInt(perPage, 10));
+//         }
+
+//         // Add rank to the paginated data
+//         coinsData.forEach((coin, index) => {
+//             coin.Rank = index + 1; // Rank starts at the current page's first item
+//         });
+
+//         // Respond with success
+//         const data = {
+//             status: 200,
+//             message: "Coins retrieved successfully!",
+//             data:coinData
+//         };
+
+//         // Add pagination information if applicable
+//         if (page && perPage) {
+//             data.pagination = {
+//                 page: parseInt(page, 10),
+//                 per_page: parseInt(perPage, 10),
+//                 total: total,
+//                 current_page: parseInt(page, 10),
+//                 last_page: Math.ceil(total / perPage),
+//             };
+//         }
+
+//         return res.status(200).json(data);
+//     } catch (error) {
+//         if (connection) await connection.rollback();
+//         return error500(error, res);
+//     } finally {
+//         if (connection) connection.release();
+//     }
+// };
 const getCoins = async (req, res) => {
     const { page, perPage, key } = req.query;
     let connection;
     try {
-        connection = await pool.getConnection();
-        let response = await axios.get(
-            `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+      connection = await pool.getConnection();
+      let response = await axios.get(
+        `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+      );
+      let rawData = response.data.Data;
+      let coinsData = [];
+  
+      // Loop through the data to log CoinInfo and DISPLAY information
+      for (let index = 0; index < rawData.length; index++) {
+        const coinInfo = rawData[index].CoinInfo;
+        const displayData = rawData[index].DISPLAY?.USD;
+        const raw = rawData[index].RAW?.USD;
+  
+        let coinDetails = {};
+  
+        if (coinInfo) {
+          coinDetails.ImageUrl = coinInfo.ImageUrl;
+          coinDetails.FullName = coinInfo.FullName;
+          coinDetails.Name = coinInfo.Name;
+        }
+  
+        if (displayData) {
+          coinDetails.PRICE = displayData.PRICE;
+          const price = displayData.PRICE.replace(/[^0-9.-]+/g, "");
+          const openHour = displayData.OPENHOUR.replace(/[^0-9.-]+/g, "");
+          const open24HOUR = displayData.OPEN24HOUR.replace(/[^0-9.-]+/g, "");
+          coinDetails.OPENHOUR = displayData.OPENHOUR;
+          let oneH = ((price - openHour) / openHour) * 100;
+          let one24H = ((price - open24HOUR) / open24HOUR) * 100;
+  
+          coinDetails.oneh = oneH.toFixed(3);
+          coinDetails.OPEN24HOUR = displayData.OPEN24HOUR;
+          coinDetails.one24h = one24H.toFixed(3);
+  
+          coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
+        }
+  
+        if (raw) {
+          const circulatingSupply = raw.CIRCULATINGSUPPLY;
+          const totalSupply = raw.SUPPLY ;
+  
+          const FDV = circulatingSupply / totalSupply;
+          const mktcap = FDV * raw.MKTCAP;
+  
+          coinDetails.FDV = FDV.toFixed(3);
+          coinDetails.MKTCAP = mktcap.toFixed(2);
+        }
+  
+        coinsData.push(coinDetails);
+      }
+  
+      if (key) {
+        coinsData = coinsData.filter((coin) =>
+          coin.FullName?.toLowerCase().includes(key.toLowerCase())
         );
-        let rawData = response.data.Data;
-        let coinsData = [];
-        
-        // Loop through the data to log CoinInfo and DISPLAY information
-        for (let index = 0; index < rawData.length; index++) {
-            const coinInfo = rawData[index].CoinInfo;
-            const displayData = rawData[index].DISPLAY?.USD;
-            const raw =  rawData[index].RAW?.USD;
-            
-            
-            
-            let coinDetails = {};
-            
-            if (coinInfo) {   
-                coinDetails.ImageUrl = coinInfo.ImageUrl; 
-                coinDetails.FullName = coinInfo.FullName;
-                coinDetails.Name = coinInfo.Name;
-            }
-            
-            if (displayData) {
-                coinDetails.PRICE = displayData.PRICE
-                const price = displayData.PRICE.replace(/[^0-9.-]+/g, "");
-                const openHour = displayData.OPENHOUR.replace(/[^0-9.-]+/g, "");
-                const open24HOUR = displayData.OPEN24HOUR.replace(/[^0-9.-]+/g, "");
-                coinDetails.OPENHOUR = displayData.OPENHOUR
-                let oneH = ((price - openHour) / openHour) * 100;
-                let one24H = ((price - open24HOUR) / open24HOUR) * 100;
-                
-                coinDetails.oneh = oneH.toFixed(3);
-                coinDetails.OPEN24HOUR = displayData.OPEN24HOUR;
-                coinDetails.one24h = one24H.toFixed(3);
-
-            coinDetails.VOLUME24HOUR = displayData.VOLUME24HOUR;
-            // coinDetails.MKTCAP = raw.MKTCAP;
-            }
-            
-            if (raw) {
-                coinDetails.MKTCAP = raw.MKTCAP;
-            }
-            coinsData.push(coinDetails);  
-        }
-        if (key) {
-            coinsData = coinsData.filter((coin) =>
-                coin.FullName?.toLowerCase().includes(key.toLowerCase())
-            );
-        }
-
-        // Calculate the total count based on the filtered data
-        const total = coinsData.length;
-        let coinData = coinsData;
-
-        // Apply pagination to the filtered data
-        if (page && perPage) {
-            const start = (page - 1) * perPage;
-            coinData = coinsData.slice(start, start + parseInt(perPage, 10));
-        }
-
-        // Add rank to the paginated data
-        coinsData.forEach((coin, index) => {
-            coin.Rank = index + 1; // Rank starts at the current page's first item
-        });
-
-        // Respond with success
-        const data = {
-            status: 200,
-            message: "Coins retrieved successfully!",
-            data:coinData
+      }
+  
+      // Calculate the total count based on the filtered data
+      const total = coinsData.length;
+      let coinData = coinsData;
+  
+      // Apply pagination to the filtered data
+      if (page && perPage) {
+        const start = (page - 1) * perPage;
+        coinData = coinsData.slice(start, start + parseInt(perPage, 10));
+      }
+  
+      // Add rank to the paginated data
+      coinsData.forEach((coin, index) => {
+        coin.Rank = index + 1;
+      });
+  
+      // Respond with success
+      const data = {
+        status: 200,
+        message: "Coins retrieved successfully!",
+        data: coinData,
+      };
+  
+      // Add pagination information if applicable
+      if (page && perPage) {
+        data.pagination = {
+          page: parseInt(page, 10),
+          per_page: parseInt(perPage, 10),
+          total: total,
+          current_page: parseInt(page, 10),
+          last_page: Math.ceil(total / perPage),
         };
-
-        // Add pagination information if applicable
-        if (page && perPage) {
-            data.pagination = {
-                page: parseInt(page, 10),
-                per_page: parseInt(perPage, 10),
-                total: total,
-                current_page: parseInt(page, 10),
-                last_page: Math.ceil(total / perPage),
-            };
-        }
-
-        return res.status(200).json(data);
+      }
+  
+      return res.status(200).json(data);
     } catch (error) {
-        if (connection) await connection.rollback();
-        return error500(error, res);
+      if (connection) await connection.rollback();
+      return error500(error, res);
     } finally {
-        if (connection) connection.release();
+      if (connection) connection.release();
     }
-};
+  };
+  
 
 // const getCoins = async (req, res) => {
 //     let connection;
