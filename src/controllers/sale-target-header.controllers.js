@@ -303,7 +303,7 @@ const createCurrentPrice = async (req, res) => {
             price = priceRaw.toString(); // If not in scientific notation, keep as-is
         }
 
-        //FDV
+        // // FDV
         // const responses = await axios.get(
         //     `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
         // )
@@ -317,6 +317,7 @@ const createCurrentPrice = async (req, res) => {
 
         // market cap
         let mktcap = null;
+        let FDV = null;
         if (mktResponse.data && mktResponse.data.Data) {
             //ticker
             const coinData = mktResponse.data.Data.find(
@@ -324,7 +325,8 @@ const createCurrentPrice = async (req, res) => {
             );
 
             if (coinData && coinData.RAW && coinData.RAW.USD) {
-                mktcap = coinData.RAW.USD.MKTCAP;
+                FDV = coinData.RAW.USD.CIRCULATINGSUPPLY / coinData.RAW.USD.SUPPLY;
+                mktcap = FDV * coinData.RAW.USD.MKTCAP;
                 // console.log(`Market Cap of ${ticker}: $${mktcap}`);
             } else {
                 // console.log(`Market Cap data for ${ticker} is not available.`);
@@ -339,7 +341,7 @@ const createCurrentPrice = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Fetch Current Price successfully",
-            data: { currentPrice: price,mktcap},
+            data: { currentPrice: price,FDV,mktcap},
         });
     } catch (error) {
         if (connection) await connection.rollback();
