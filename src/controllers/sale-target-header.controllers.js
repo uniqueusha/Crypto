@@ -542,6 +542,8 @@ const getSetTargetDownload = async (req, res) => {
 
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
+            
+            
 
             // Fetch footer data for each sale_target
             const setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
@@ -562,9 +564,14 @@ const getSetTargetDownload = async (req, res) => {
                         coin: element.coin,
                         base_price: element.base_price,
                         currant_price: element.currant_price,
+                        market_cap : element.market_cap,
+                        current_return_x : element.current_return_x,
+                        current_value : element.current_value,
                         return_x: element.return_x,
                         final_sale_price: element.final_sale_price,
                         available_coins: element.available_coins,
+                        timeframe : element.timeframe,
+                        fdv_ratio : element.fdv_ratio,
                         sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
                         target_status: footer.target_status,
