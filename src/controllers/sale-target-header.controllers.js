@@ -1027,21 +1027,27 @@ const getSetTargetReached = async (req, res) => {
 const getSoldCoin = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
-    // Attempt to obtain a database connection
+
     let connection = await getConnection();
     try {
-        //Start the transaction
+        // Start the transaction
         await connection.beginTransaction();
 
-        let getSoldCoinQuery = `SELECT sc.*,sf.sale_target_coin FROM sold_coin sc
-        LEFT JOIN set_target_footer sf
-        ON sc.set_footer_id = sf.set_footer_id
-        WHERE sc.untitled_id = ${untitledId}`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sold_coin sc
-        LEFT JOIN set_target_footer sf
-        ON sc.set_footer_id = sf.set_footer_id
-        WHERE sc.untitled_id = ${untitledId}`;
+        // Query to get sold coin data with calculated total
+        let getSoldCoinQuery = `
+            SELECT sc.*, sf.sale_target_coin, 
+            (sc.sold_current_price * sf.sale_target_coin) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
 
+        let countQuery = `
+            SELECT COUNT(*) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
+
+        // Filtering by key if provided
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
@@ -1055,33 +1061,42 @@ const getSoldCoin = async (req, res) => {
                 countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
             }
         }
+
         getSoldCoinQuery += " ORDER BY sc.created_at DESC";
+
         // Apply pagination if both page and perPage are provided
-        let total = 0;
+        let totalRecords = 0;
         if (page && perPage) {
             const totalResult = await connection.query(countQuery);
-            total = parseInt(totalResult[0][0].total);
+            totalRecords = parseInt(totalResult[0][0].total);
 
             const start = (page - 1) * perPage;
             getSoldCoinQuery += ` LIMIT ${perPage} OFFSET ${start}`;
         }
+
         const result = await connection.query(getSoldCoinQuery);
         const soldCoin = result[0];
+
+        // Calculate the sum of total column
+        const totalSum = soldCoin.reduce((sum, item) => sum + (item.total || 0), 0);
 
         const data = {
             status: 200,
             message: "Sold Coin retrieved successfully",
             data: soldCoin,
+            totalSum: totalSum // Adding total sum to the response
         };
+
         // Add pagination information if provided
         if (page && perPage) {
             data.pagination = {
                 per_page: perPage,
-                total: total,
+                total: totalRecords,
                 current_page: page,
-                last_page: Math.ceil(total / perPage),
+                last_page: Math.ceil(totalRecords / perPage),
             };
         }
+
         return res.status(200).json(data);
     } catch (error) {
         return error500(error, res);
