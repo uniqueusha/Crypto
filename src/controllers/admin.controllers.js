@@ -547,6 +547,74 @@ const getUserCount = async (req, res) => {
     }
 };
 
+const onChangePassword = async (req, res) => {
+    const email_id = req.body.email_id ? req.body.email_id.trim() : "";
+    const password = req.body.password || "";
+    const new_password = req.body.new_password || "";
+  
+    if (!email_id) {
+      return error422("Email Id required.", res);
+    }
+    if (!password) {
+      return error422("Password is required.", res);
+    }
+    if (!new_password) {
+      return error422("New password is required.", res);
+    }
+  
+    let connection = await getConnection();
+  
+    try {
+        await connection.beginTransaction();
+  
+      // Check if email_id exists
+      const checkUserQuery = "SELECT * FROM untitled WHERE LOWER(TRIM(email_id)) = ? AND status = 1";
+      const [checkUserResult] = await connection.query(checkUserQuery, [email_id.toLowerCase()]);
+      if (checkUserResult.length === 0) {
+        return error422('Email id is not found.', res);
+      }
+      const userData = checkUserResult[0]; // Extract the first row
+      
+
+      // Retrieve the hashed password from the database (update column name if needed)
+      const contrasenaQuery = 'SELECT extenstions FROM contrasena WHERE untitled_id = ?';
+      const [contrasenaResult] = await connection.query(contrasenaQuery, [userData.untitled_id]);
+  
+      if (contrasenaResult.length === 0) {
+        return error422("Password not found for this user.", res);
+      }
+      
+      const hash = contrasenaResult[0].extenstions;
+      if (!hash) {
+        return error422('Stored password hash is missing.', res);
+      }
+  
+      const isValid = await bcrypt.compare(password, hash);
+      if (!isValid) {
+        return error422('Incorrect password.', res);
+      }
+  
+      // Hash the new password
+      const newHashedPassword = await bcrypt.hash(new_password, 10);
+  
+      // Update the user's password in the database
+      const updateQuery = `UPDATE contrasena SET extenstions = ? WHERE untitled_id = ?`;
+      await connection.query(updateQuery, [newHashedPassword, userData.untitled_id]);
+  
+      await connection.commit();
+      return res.status(200).json({ 
+        status: 200,
+        message: "Password updated successfully."
+       });
+    } catch (error) {
+      
+      error500(error, res);
+    } finally {
+      if (connection) connection.release();
+    }
+};
+
+
 
 
 
@@ -561,7 +629,8 @@ module.exports = {
     updateUser,
     onStatusChange,
     getUserWma,
-    getUserCount
+    getUserCount,
+    onChangePassword
     
 
 }

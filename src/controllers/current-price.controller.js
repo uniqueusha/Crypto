@@ -81,13 +81,14 @@ const addCurrentPrice = async (req, res) => {
 
         // const supply = responses.data.Data[0]?.ConversionInfo?.Supply || 0;
         // const fdv_ratio = price / supply;
-const fdv_ratio = 0;
+
 const mktResponse = await axios.get(
   `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
 );
 
 // market cap
 let mktcap = null;
+let fdv_ratio = null;
 if (mktResponse.data && mktResponse.data.Data) {
   //ticker
   const coinData = mktResponse.data.Data.find(
@@ -95,7 +96,8 @@ if (mktResponse.data && mktResponse.data.Data) {
   );
 
   if (coinData && coinData.RAW && coinData.RAW.USD) {
-      mktcap = coinData.RAW.USD.MKTCAP;
+                fdv_ratio  = coinData.RAW.USD.CIRCULATINGSUPPLY / coinData.RAW.USD.SUPPLY;
+                mktcap = fdv_ratio * coinData.RAW.USD.MKTCAP;
       // console.log(`Market Cap of ${ticker}: $${mktcap}`);
   } else {
       // console.log(`Market Cap data for ${ticker} is not available.`);
@@ -161,7 +163,6 @@ if (mktResponse.data && mktResponse.data.Data) {
       message: `All current price  added/updated successfully .`,
     });
   } catch (error) {
-    console.log(error);
     
     if (connection) await connection.rollback();
     return error500(error, res);
@@ -176,39 +177,41 @@ const getCurrentprice = async (req, res) => {
   try {
     connection = await getConnection();
     await connection.beginTransaction();
+
+    // Updated totalCurrentValue query
     const getTotalCurrentValueQuery = `
-  SELECT 
-  total_value, 
-  ticker, 
-  untitled_id, 
-  SUM(total_value) OVER () AS totalCurrentValue
-FROM (
-  SELECT current_value AS total_value, ticker, untitled_id
-  FROM current_price
-  WHERE untitled_id = ? AND status = 1
+      SELECT (
+        COALESCE(
+          (SELECT SUM(current_value) 
+           FROM current_price 
+           WHERE untitled_id = ? AND status = 1),
+          0
+        ) 
+        + 
+        COALESCE(
+          (SELECT SUM(sh.current_value)
+           FROM sale_target_header sh
+           WHERE NOT EXISTS (
+             SELECT 1 
+             FROM current_price c 
+             WHERE c.ticker = sh.ticker
+           ) 
+           AND sh.untitled_id = ? AND sh.status = 1),
+          0
+        )
+      ) AS totalCurrentValue
+    `;
 
-  UNION ALL
+    const [totalValueResult] = await connection.query(
+      getTotalCurrentValueQuery,
+      [untitledId, untitledId]
+    );
 
-  SELECT sth.current_value, sth.ticker, sth.untitled_id
-  FROM sale_target_header sth
-  WHERE sth.untitled_id = ? AND sth.status = 1
-  AND NOT EXISTS (
-    SELECT 1 
-    FROM current_price cp
-    WHERE cp.untitled_id = sth.untitled_id 
-    AND cp.ticker = sth.ticker
-  )
-) AS combined_values
-  `;
-  
-  const [totalValueResult] = await connection.query(
-    getTotalCurrentValueQuery,
-    [untitledId, untitledId]
-  );
-  
     // Fetch all columns
     const getCurrentPriceDetailsQuery = `
-      SELECT * FROM current_price  WHERE untitled_id = ? AND status = 1
+      SELECT * 
+      FROM current_price  
+      WHERE untitled_id = ? AND status = 1
     `;
     const [priceDetails] = await connection.query(getCurrentPriceDetailsQuery, [
       untitledId,
@@ -284,6 +287,7 @@ FROM (
 //     if (connection) connection.release();
 //   }
 // };
+
 
 
 

@@ -303,7 +303,7 @@ const createCurrentPrice = async (req, res) => {
             price = priceRaw.toString(); // If not in scientific notation, keep as-is
         }
 
-        //FDV
+        // // FDV
         // const responses = await axios.get(
         //     `https://min-api.cryptocompare.com/data/coin/generalinfo?fsyms=${ticker}&tsym=USD`
         // )
@@ -317,6 +317,7 @@ const createCurrentPrice = async (req, res) => {
 
         // market cap
         let mktcap = null;
+        let FDV = null;
         if (mktResponse.data && mktResponse.data.Data) {
             //ticker
             const coinData = mktResponse.data.Data.find(
@@ -324,7 +325,8 @@ const createCurrentPrice = async (req, res) => {
             );
 
             if (coinData && coinData.RAW && coinData.RAW.USD) {
-                mktcap = coinData.RAW.USD.MKTCAP;
+                FDV = coinData.RAW.USD.CIRCULATINGSUPPLY / coinData.RAW.USD.SUPPLY;
+                mktcap = FDV * coinData.RAW.USD.MKTCAP;
                 // console.log(`Market Cap of ${ticker}: $${mktcap}`);
             } else {
                 // console.log(`Market Cap data for ${ticker} is not available.`);
@@ -339,7 +341,7 @@ const createCurrentPrice = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: "Fetch Current Price successfully",
-            data: { currentPrice: price,mktcap},
+            data: { currentPrice: price,FDV,mktcap},
         });
     } catch (error) {
         if (connection) await connection.rollback();
@@ -540,6 +542,8 @@ const getSetTargetDownload = async (req, res) => {
 
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
+            
+            
 
             // Fetch footer data for each sale_target
             const setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
@@ -560,9 +564,14 @@ const getSetTargetDownload = async (req, res) => {
                         coin: element.coin,
                         base_price: element.base_price,
                         currant_price: element.currant_price,
+                        market_cap : element.market_cap,
+                        current_return_x : element.current_return_x,
+                        current_value : element.current_value,
                         return_x: element.return_x,
                         final_sale_price: element.final_sale_price,
                         available_coins: element.available_coins,
+                        timeframe : element.timeframe,
+                        fdv_ratio : element.fdv_ratio,
                         sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
                         target_status: footer.target_status,
@@ -1018,21 +1027,27 @@ const getSetTargetReached = async (req, res) => {
 const getSoldCoin = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
-    // Attempt to obtain a database connection
+
     let connection = await getConnection();
     try {
-        //Start the transaction
+        // Start the transaction
         await connection.beginTransaction();
 
-        let getSoldCoinQuery = `SELECT sc.*,sf.sale_target_coin FROM sold_coin sc
-        LEFT JOIN set_target_footer sf
-        ON sc.set_footer_id = sf.set_footer_id
-        WHERE sc.untitled_id = ${untitledId}`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sold_coin sc
-        LEFT JOIN set_target_footer sf
-        ON sc.set_footer_id = sf.set_footer_id
-        WHERE sc.untitled_id = ${untitledId}`;
+        // Query to get sold coin data with calculated total
+        let getSoldCoinQuery = `
+            SELECT sc.*, sf.sale_target_coin, 
+            (sc.sold_current_price * sf.sale_target_coin) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
 
+        let countQuery = `
+            SELECT COUNT(*) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
+
+        // Filtering by key if provided
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
@@ -1046,33 +1061,42 @@ const getSoldCoin = async (req, res) => {
                 countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
             }
         }
+
         getSoldCoinQuery += " ORDER BY sc.created_at DESC";
+
         // Apply pagination if both page and perPage are provided
-        let total = 0;
+        let totalRecords = 0;
         if (page && perPage) {
             const totalResult = await connection.query(countQuery);
-            total = parseInt(totalResult[0][0].total);
+            totalRecords = parseInt(totalResult[0][0].total);
 
             const start = (page - 1) * perPage;
             getSoldCoinQuery += ` LIMIT ${perPage} OFFSET ${start}`;
         }
+
         const result = await connection.query(getSoldCoinQuery);
         const soldCoin = result[0];
+
+        // Calculate the sum of total column
+        const totalSum = soldCoin.reduce((sum, item) => sum + (item.total || 0), 0);
 
         const data = {
             status: 200,
             message: "Sold Coin retrieved successfully",
             data: soldCoin,
+            totalSum: totalSum // Adding total sum to the response
         };
+
         // Add pagination information if provided
         if (page && perPage) {
             data.pagination = {
                 per_page: perPage,
-                total: total,
+                total: totalRecords,
                 current_page: page,
-                last_page: Math.ceil(total / perPage),
+                last_page: Math.ceil(totalRecords / perPage),
             };
         }
+
         return res.status(200).json(data);
     } catch (error) {
         return error500(error, res);
