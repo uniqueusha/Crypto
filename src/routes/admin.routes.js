@@ -15,6 +15,8 @@ router.get('/wma',userController.getUserWma);
 router.get('/user-count', userController.getUserCount);
 //get list by id
 router.get('/:id',userController.getUser);
+//chnage password
+router.put('/change-password', userController.onChangePassword);
 //update user
 router.put('/:id',userController.updateUser);
 //update status
