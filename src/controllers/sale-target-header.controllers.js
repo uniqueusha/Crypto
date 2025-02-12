@@ -1175,7 +1175,7 @@ const getSoldCoinDownload = async (req, res) => {
 
         const data = {
             status: 200,
-            message: "Adha retrieved successfully",
+            message: "Sold Coin retrieved successfully",
             data: soldCoin ,
         };
 
@@ -1215,7 +1215,89 @@ const getSoldCoinDownload = async (req, res) => {
         // Commit the transaction
         await connection.commit();
     } catch (error) {
-        console.log(error);
+        
+        
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+const getDashboardDownload = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    const { key } = req.query;
+
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        let getSetTargetQuery = `
+            SELECT * FROM sale_target_header 
+            WHERE untitled_id = ${untitledId} AND status = 1`
+
+        // Add search/filtering if a key is provided
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSetTargetQuery += ` AND status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSetTargetQuery += ` AND status = 0`;
+            } else {
+                getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+            }
+        }
+
+        getSetTargetQuery += " ORDER BY sale_date DESC";
+
+        // Fetch the header data
+        let result = await connection.query(getSetTargetQuery);
+        let setTargetDashboard = result[0];
+
+        const data = {
+            status: 200,
+            message: "Set target retrieved successfully",
+            data: setTargetDashboard ,
+        };
+
+        // Prepare flattened data for Excel
+        
+        if (data.length === 0) {
+            return error422("No data found.", res);
+        }
+
+        // Create a new workbook
+        const workbook = xlsx.utils.book_new();
+        
+        // Create a worksheet and add flattened data to it
+        const worksheet = xlsx.utils.json_to_sheet(setTargetDashboard);
+        
+        // Add the worksheet to the workbook
+        xlsx.utils.book_append_sheet(workbook, worksheet, "setTargetDashboardInfo");
+
+        // Create a unique file name (e.g., based on timestamp)
+        const excelFileName = `exported_data_${Date.now()}.xlsx`;
+        
+        // Write the workbook to a file
+        xlsx.writeFile(workbook, excelFileName);
+
+        // Send the file to the client for download
+        res.download(excelFileName, (err) => {
+            if (err) {
+                // Handle any errors that occur during download
+                console.error(err);
+                res.status(500).send("Error downloading the file.");
+            } else {
+                // Delete the file after it's been sent
+                fs.unlinkSync(excelFileName);
+            }
+        });
+
+        // Commit the transaction
+        await connection.commit();
+    } catch (error) {
+        
         
         return error500(error, res);
     } finally {
@@ -1240,5 +1322,6 @@ module.exports = {
     getSetTargetReached,
     getSoldCoin,
     getCurrentPriceCount,
-    getSoldCoinDownload
+    getSoldCoinDownload,
+    getDashboardDownload
 }
