@@ -1253,13 +1253,41 @@ const getDashboardDownload = async (req, res) => {
 
         // Fetch the header data
         let result = await connection.query(getSetTargetQuery);
-        let setTargetDashboard = result[0];
+        let setTarget = result[0];
 
-        const data = {
-            status: 200,
-            message: "Set target retrieved successfully",
-            data: setTargetDashboard ,
-        };
+        let filteredData = [];
+        for (let i = 0; i < setTarget.length; i++) {
+            const element = setTarget[i];
+
+            // Fetch all footer data for the current header
+            let setFooterQuery = `
+                SELECT stf.*, ts.target_status, cs.complition_status 
+                FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+                WHERE stf.sale_target_id = ${element.sale_target_id} 
+                AND stf.untitled_id = ${untitledId}`;
+
+            const setFooterResult = await connection.query(setFooterQuery);
+
+            // Check if at least one footer record has `target_id = 2`
+            const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
+
+            // Include the header only if `target_id = 2` exists, along with all footer data
+            if (hasTargetId2) {
+                element['footer'] = setFooterResult[0].reverse(); // Include all footer data
+                filteredData.push(element);
+            }
+        }
+
+ 
+         // Build the response object
+         const data = {
+             status: 200,
+             message: "Set Target retrieved successfully",
+             data: filteredData,
+         };
+        
 
         // Prepare flattened data for Excel
         
@@ -1271,10 +1299,10 @@ const getDashboardDownload = async (req, res) => {
         const workbook = xlsx.utils.book_new();
         
         // Create a worksheet and add flattened data to it
-        const worksheet = xlsx.utils.json_to_sheet(setTargetDashboard);
+        const worksheet = xlsx.utils.json_to_sheet(filteredData);
         
         // Add the worksheet to the workbook
-        xlsx.utils.book_append_sheet(workbook, worksheet, "setTargetDashboardInfo");
+        xlsx.utils.book_append_sheet(workbook, worksheet, "filteredDataInfo");
 
         // Create a unique file name (e.g., based on timestamp)
         const excelFileName = `exported_data_${Date.now()}.xlsx`;
@@ -1298,6 +1326,7 @@ const getDashboardDownload = async (req, res) => {
         await connection.commit();
     } catch (error) {
         
+        console.log(error);
         
         return error500(error, res);
     } finally {
