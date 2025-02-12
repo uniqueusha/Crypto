@@ -116,6 +116,7 @@ const addSaleTargetHeader1 = async (req, res) => {
 const addSaleTargetHeader = async (req, res) => {
     const ticker = req.body.ticker || '';
     const coin = req.body.coin || '';
+    const exchange = req.body.exchange || '';
     const base_price = parseFloat(req.body.base_price) || 0;
     const currant_price = parseFloat(req.body.currant_price) || 0;
     const current_value = parseFloat(req.body.current_value) || 0;
@@ -155,12 +156,12 @@ const addSaleTargetHeader = async (req, res) => {
 
         const insertSaleTargetHeaderQuery = `
             INSERT INTO sale_target_header (
-                ticker, coin, base_price, currant_price, current_value, current_return_x,
+                ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
                 market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         const insertSaleTargetHeaderValues = [
-            ticker, coin, base_price, currant_price, current_value, current_return_x,
+            ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
             market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
         ];
 
@@ -723,6 +724,7 @@ const updateSetTarget = async (req, res) => {
     const sale_target_id = parseInt(req.params.id);
     const ticker = req.body.ticker ? req.body.ticker : '';
     const coin = req.body.coin ? req.body.coin : '';
+    const exchange = req.body.exchange ? req.body.exchange : '';
     const base_price = req.body.base_price ? req.body.base_price : '';
     const currant_price = req.body.currant_price ? req.body.currant_price : '';
     const current_value = req.body.current_value ? req.body.current_value : '';
@@ -758,8 +760,8 @@ const updateSetTarget = async (req, res) => {
         await connection.beginTransaction();
 
         // Update Sale Target Header
-        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ? WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, sale_target_id, untitled_id]);
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, exchange, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, sale_target_id, untitled_id]);
 
         // Update set target footer
         let setTargetFooterArray = setTargetFooter.reverse();
@@ -1155,23 +1157,14 @@ const getSoldCoinDownload = async (req, res) => {
             LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
             WHERE sc.untitled_id = ${untitledId}`;
 
-        let countQuery = `
-            SELECT COUNT(*) AS total 
-            FROM sold_coin sc
-            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
-            WHERE sc.untitled_id = ${untitledId}`;
-
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
-                getSoldCoinQuery += ` AND sc.status = 1`;
-                countQuery += ` AND sc.status = 1`;
+                getSoldCoinQuery += ` AND sc.status = 1`; 
             } else if (lowercaseKey === "deactivated") {
                 getSoldCoinQuery += ` AND sc.status = 0`;
-                countQuery += ` AND sc.status = 0`;
             } else {
-                getSoldCoinQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
+                getSoldCoinQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `; 
             }
         }
 
@@ -1180,9 +1173,15 @@ const getSoldCoinDownload = async (req, res) => {
         let result = await connection.query(getSoldCoinQuery);
         let soldCoin = result[0];
 
+        const data = {
+            status: 200,
+            message: "Adha retrieved successfully",
+            data: soldCoin ,
+        };
+
         // Prepare flattened data for Excel
         
-        if (soldCoin.length === 0) {
+        if (data.length === 0) {
             return error422("No data found.", res);
         }
 
