@@ -4,6 +4,7 @@ const xlsx = require('xlsx');
 const fs = require('fs');
 
 
+
 // Function to obtain a database connection
 const getConnection = async () => {
     try {
@@ -1137,6 +1138,91 @@ const getCurrentPriceCount = async (req, res) => {
     }
 };
 
+const getSoldCoinDownload = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    const { key } = req.query;
+
+    // Attempt to obtain a database connection
+    let connection = await getConnection();
+    try {
+        // Start a transaction
+        await connection.beginTransaction();
+
+        let getSoldCoinQuery = `
+            SELECT sc.*, sf.sale_target_coin, 
+            (sc.sold_current_price * sf.sale_target_coin) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
+
+        let countQuery = `
+            SELECT COUNT(*) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            WHERE sc.untitled_id = ${untitledId}`;
+
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSoldCoinQuery += ` AND sc.status = 1`;
+                countQuery += ` AND sc.status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSoldCoinQuery += ` AND sc.status = 0`;
+                countQuery += ` AND sc.status = 0`;
+            } else {
+                getSoldCoinQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
+                countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
+            }
+        }
+
+        getSoldCoinQuery += " ORDER BY sc.created_at DESC";
+
+        let result = await connection.query(getSoldCoinQuery);
+        let soldCoin = result[0];
+
+        // Prepare flattened data for Excel
+        
+        if (soldCoin.length === 0) {
+            return error422("No data found.", res);
+        }
+
+        // Create a new workbook
+        const workbook = xlsx.utils.book_new();
+        
+        // Create a worksheet and add flattened data to it
+        const worksheet = xlsx.utils.json_to_sheet(soldCoin);
+        
+        // Add the worksheet to the workbook
+        xlsx.utils.book_append_sheet(workbook, worksheet, "SoldCoinInfo");
+
+        // Create a unique file name (e.g., based on timestamp)
+        const excelFileName = `exported_data_${Date.now()}.xlsx`;
+        
+        // Write the workbook to a file
+        xlsx.writeFile(workbook, excelFileName);
+
+        // Send the file to the client for download
+        res.download(excelFileName, (err) => {
+            if (err) {
+                // Handle any errors that occur during download
+                console.error(err);
+                res.status(500).send("Error downloading the file.");
+            } else {
+                // Delete the file after it's been sent
+                fs.unlinkSync(excelFileName);
+            }
+        });
+
+        // Commit the transaction
+        await connection.commit();
+    } catch (error) {
+        console.log(error);
+        
+        return error500(error, res);
+    } finally {
+        if (connection) connection.release();
+    }
+};
 
 
 
@@ -1154,5 +1240,6 @@ module.exports = {
     deleteSetTargetChangeStatus,
     getSetTargetReached,
     getSoldCoin,
-    getCurrentPriceCount
+    getCurrentPriceCount,
+    getSoldCoinDownload
 }
