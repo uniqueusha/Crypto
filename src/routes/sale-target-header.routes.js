@@ -6,6 +6,7 @@ const checkAuth = require("../middleware/check.auth");
 //add sale target header
 router.post('/', checkAuth, saleTargetHeaderController.addSaleTargetHeader);
 router.post('/currant-price', saleTargetHeaderController.createCurrentPrice);
+router.post('/coin-exchange', checkAuth, saleTargetHeaderController.addCoinExchange);
 router.get('/', checkAuth, saleTargetHeaderController.getSetTargets);
 router.get('/currant-price-count', checkAuth, saleTargetHeaderController.getCurrentPriceCount);
 router.get('/set-target-count', checkAuth, saleTargetHeaderController.getSetTargetCount);

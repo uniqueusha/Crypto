@@ -497,9 +497,13 @@ const getCoinWma = async (req, res) => {
         // Start a transaction
         let coinQuery = `SELECT * FROM coins
         WHERE status = 1`;
+        // if (key) {
+        //     const lowercaseKey = key.toLowerCase().trim();
+        //     coinQuery += ` AND LOWER(short_name) LIKE '%${lowercaseKey}%'`;  
+        // }
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
-            coinQuery += ` AND LOWER(short_name) LIKE '%${lowercaseKey}%'`;  
+            coinQuery += ` AND TRIM(LOWER(short_name)) = '${lowercaseKey}'`;
         }
         coinQuery += ` ORDER BY short_name ASC`;
         coinQuery += ` limit 200`;
