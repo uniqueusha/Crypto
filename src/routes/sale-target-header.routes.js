@@ -11,6 +11,7 @@ router.get('/currant-price-count', checkAuth, saleTargetHeaderController.getCurr
 router.get('/set-target-count', checkAuth, saleTargetHeaderController.getSetTargetCount);
 router.get('/download-set-target', checkAuth, saleTargetHeaderController.getSetTargetDownload);
 router.get('/download-sold-coin', checkAuth, saleTargetHeaderController.getSoldCoinDownload);
+router.get('/download-dashboard', checkAuth, saleTargetHeaderController.getDashboardDownload);
 router.get('/reached', checkAuth, saleTargetHeaderController.getSetTargetReached);
 router.get('/sold-coin', checkAuth, saleTargetHeaderController.getSoldCoin);
 router.get('/:id', checkAuth, saleTargetHeaderController.getSetTarget);
