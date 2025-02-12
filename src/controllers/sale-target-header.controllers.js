@@ -545,8 +545,6 @@ const getSetTargetDownload = async (req, res) => {
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
             
-            
-
             // Fetch footer data for each sale_target
             const setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
             LEFT JOIN target_status ts
@@ -1269,29 +1267,52 @@ const getDashboardDownload = async (req, res) => {
                 AND stf.untitled_id = ${untitledId}`;
 
             const setFooterResult = await connection.query(setFooterQuery);
+            const footerRows = setFooterResult[0];
 
             // Check if at least one footer record has `target_id = 2`
-            const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
+            const hasTargetId2 = footerRows.some((footer) => footer.target_id === 2);
+
 
             // Include the header only if `target_id = 2` exists, along with all footer data
             if (hasTargetId2) {
-                element['footer'] = setFooterResult[0].reverse(); // Include all footer data
-                filteredData.push(element);
+                for (let footer of footerRows) {
+                    filteredData.push({
+                        sale_target_id: element.sale_target_id,
+                        sale_date: element.sale_date,
+                        coin: element.coin,
+                        base_price: element.base_price,
+                        currant_price: element.currant_price,
+                        market_cap : element.market_cap,
+                        current_return_x : element.current_return_x,
+                        current_value : element.current_value,
+                        return_x: element.return_x,
+                        final_sale_price: element.final_sale_price,
+                        available_coins: element.available_coins,
+                        timeframe : element.timeframe,
+                        fdv_ratio : element.fdv_ratio,
+                        sale_target_coin: footer.sale_target_coin,
+                        sale_target: footer.sale_target,
+                        target_status: footer.target_status,
+                        complition_status: footer.complition_status,
+                        footer_percent: footer.sale_target_percent,
+                    });
+                }
             }
         }
 
+        
  
-         // Build the response object
-         const data = {
-             status: 200,
-             message: "Set Target retrieved successfully",
-             data: filteredData,
-         };
+        //  // Build the response object
+        //  const data = {
+        //      status: 200,
+        //      message: "Set Target retrieved successfully",
+        //      data: filteredData,
+        //  };
         
 
         // Prepare flattened data for Excel
         
-        if (data.length === 0) {
+        if (filteredData.length === 0) {
             return error422("No data found.", res);
         }
 
@@ -1300,6 +1321,8 @@ const getDashboardDownload = async (req, res) => {
         
         // Create a worksheet and add flattened data to it
         const worksheet = xlsx.utils.json_to_sheet(filteredData);
+       
+        
         
         // Add the worksheet to the workbook
         xlsx.utils.book_append_sheet(workbook, worksheet, "filteredDataInfo");
@@ -1325,9 +1348,7 @@ const getDashboardDownload = async (req, res) => {
         // Commit the transaction
         await connection.commit();
     } catch (error) {
-        
-        console.log(error);
-        
+       
         return error500(error, res);
     } finally {
         if (connection) connection.release();
