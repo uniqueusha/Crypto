@@ -144,12 +144,17 @@ const addSaleTargetHeader = async (req, res) => {
 
     try {
         // Check if the coin already exists
-        const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1`;
-        const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
+        // const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1`;
+        // const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
 
-        if (isExistCoinResult[0].length > 0) {
-            return error422("Coin already exists.", res);
-        }
+         // Check if the coin already exists
+        //  const isExistExchangeQuery = `SELECT * FROM sale_target_header WHERE  untitled_id = ? AND status = 1 AND exchange = ?`;
+        //  const isExistExchangeResult = await pool.query(isExistExchangeQuery, [untitled_id, exchange]);
+ 
+         
+        // if (isExistCoinResult[0].length > 0 && isExistExchangeResult[0].length > 0) {
+        //     return error422("Coin And Exchange already exists.", res);
+        // }
 
         // Start the transaction
         await connection.beginTransaction();
@@ -209,6 +214,64 @@ const addSaleTargetHeader = async (req, res) => {
         await connection.release();
     }
 };
+
+//coin and exchange already exist
+const addCoinExchange = async (req, res) => {
+    const coin = req.body.coin || '';
+    const exchange = req.body.exchange || '';
+    const untitled_id = req.companyData.untitled_id;
+
+    if (!coin) {
+        return error422("Coin is required.", res);
+    }
+
+    let connection = await getConnection();
+
+    try {
+        // Check if the coin already exists
+        const isExistCoinQuery = `SELECT coin FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1 LIMIT 1`;
+        const isExistCoinResult = await connection.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
+
+        // Check if the exchange already exists
+        const isExistExchangeQuery = `SELECT exchange FROM sale_target_header WHERE untitled_id = ? AND status = 1 AND exchange = ? LIMIT 1`;
+        const isExistExchangeResult = await connection.query(isExistExchangeQuery, [untitled_id, exchange]);
+
+
+        // Check if both exist
+        if (isExistCoinResult.length > 0 && isExistExchangeResult[0].length > 0) {
+           
+            
+            return error422("Coin And Exchange already exist.", res);
+        }
+
+        const insertSaleTargetHeaderQuery = `
+            INSERT INTO sale_target_header (
+             coin, exchange, untitled_id
+            ) VALUES ( ?, ?, ?)`;
+
+        const insertSaleTargetHeaderValues = [
+            coin, exchange, untitled_id
+        ];
+
+        const [insertSaleTargetHeaderResult] = await connection.query(insertSaleTargetHeaderQuery, insertSaleTargetHeaderValues);
+        
+
+        // Perform further actions
+        await connection.commit();
+        res.status(200).json({
+            status: 200,
+            message: "Set Target Added successfully",
+        });
+    } catch (error) {
+        console.log(error);
+        
+        return error500(error, res);
+    } finally {
+        await connection.release();
+    }
+};
+
+
 
 
 //create current price
@@ -1373,5 +1436,6 @@ module.exports = {
     getSoldCoin,
     getCurrentPriceCount,
     getSoldCoinDownload,
-    getDashboardDownload
+    getDashboardDownload,
+    addCoinExchange
 }
