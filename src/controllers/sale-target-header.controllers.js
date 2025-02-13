@@ -306,6 +306,7 @@ const addSaleTargetHeader = async (req, res) => {
 const addCoinExchange = async (req, res) => {
     const coin = req.body.coin || '';
     const exchange = req.body.exchange || '';
+    const sale_target_id = req.body.sale_target_id;
     const untitled_id = req.companyData.untitled_id;
 
     if (!coin) {
@@ -325,10 +326,21 @@ const addCoinExchange = async (req, res) => {
             return error422("Coin and Exchange already exist.", res);
         }
 
+        if (sale_target_id) {
+            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1 AND LOWER(TRIM(exchange)) = ? AND sale_target_id != ?`;
+            const [coinResult] = await connection.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id, exchange.toLowerCase()], sale_target_id); 
+    
+            const existingCoin = coinResult[0]?.coin || '';
+            const existingExchange = coinResult[0]?.exchange || '';
+    
+            if (existingCoin.length > 0 && existingExchange.length > 0) {
+                return error422("Coin and Exchange already exist.", res);
+            }
+        }
+
         await connection.commit();
         res.status(200).json({
-            status: 200,
-            
+            status: 200, 
         });
     } catch (error) {
         return error500(error, res);
@@ -885,6 +897,8 @@ const updateSetTarget = async (req, res) => {
     let connection = await getConnection();
 
     try {
+       
+        
         // Start a transaction
         await connection.beginTransaction();
 
