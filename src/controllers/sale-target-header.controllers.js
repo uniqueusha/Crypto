@@ -303,7 +303,7 @@ const addSaleTargetHeader = async (req, res) => {
 //     }
 // };
 
-const addCoinExchange = async (req, res) => {
+const checkCoinExchange = async (req, res) => {
     const coin = req.body.coin || '';
     const exchange = req.body.exchange || '';
     const sale_target_id = req.body.sale_target_id;
@@ -316,26 +316,17 @@ const addCoinExchange = async (req, res) => {
     let connection = await getConnection();
 
     try {
-        const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1 AND LOWER(TRIM(exchange)) = ?`;
+        let isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1 AND LOWER(TRIM(exchange)) = ? `;
+        if (sale_target_id) {
+            isExistCoinQuery += ` AND sale_target_id != ${sale_target_id}`;
+        }
         const [coinResult] = await connection.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id, exchange.toLowerCase()]); 
 
         const existingCoin = coinResult[0]?.coin || '';
         const existingExchange = coinResult[0]?.exchange || '';
-
+    
         if (existingCoin.length > 0 && existingExchange.length > 0) {
             return error422("Coin and Exchange already exist.", res);
-        }
-
-        if (sale_target_id) {
-            const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1 AND LOWER(TRIM(exchange)) = ? AND sale_target_id != ?`;
-            const [coinResult] = await connection.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id, exchange.toLowerCase()], sale_target_id); 
-    
-            const existingCoin = coinResult[0]?.coin || '';
-            const existingExchange = coinResult[0]?.exchange || '';
-    
-            if (existingCoin.length > 0 && existingExchange.length > 0) {
-                return error422("Coin and Exchange already exist.", res);
-            }
         }
 
         await connection.commit();
@@ -348,10 +339,6 @@ const addCoinExchange = async (req, res) => {
         await connection.release();
     }
 };
-
-
-
-
 
 
 //create current price
@@ -1519,5 +1506,5 @@ module.exports = {
     getCurrentPriceCount,
     getSoldCoinDownload,
     getDashboardDownload,
-    addCoinExchange
+    checkCoinExchange
 }
