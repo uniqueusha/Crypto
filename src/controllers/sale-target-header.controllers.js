@@ -303,7 +303,7 @@ const addSaleTargetHeader = async (req, res) => {
 //     }
 // };
 
-const addCoinExchange = async (req, res) => {
+const checkCoinExchange = async (req, res) => {
     const coin = req.body.coin || '';
     const exchange = req.body.exchange || '';
     const sale_target_id = req.body.sale_target_id;
@@ -1506,5 +1506,5 @@ module.exports = {
     getCurrentPriceCount,
     getSoldCoinDownload,
     getDashboardDownload,
-    addCoinExchange
+    checkCoinExchange
 }
