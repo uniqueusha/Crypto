@@ -2,6 +2,7 @@ const pool = require("../../db");
 const axios = require('axios');
 const xlsx = require('xlsx');
 const fs = require('fs');
+const { log } = require("console");
 
 
 
@@ -565,87 +566,11 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
 const getSetTargets = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { page, perPage, key } = req.query;
-    // Attempt to obtain a database connection
-    let connection = await getConnection();
-    try {
-        //Start the transaction
-        await connection.beginTransaction();
-
-        let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-        let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-
-        if (key) {
-            const lowercaseKey = key.toLowerCase().trim();
-            if (lowercaseKey === "activated") {
-                getSetTargetQuery += ` AND status = 1`;
-                countQuery += ` AND status = 1`;
-            } else if (lowercaseKey === "deactivated") {
-                getSetTargetQuery += ` AND status = 0`;
-                countQuery += ` AND status = 0`;
-            } else {
-                getSetTargetQuery += ` AND  LOWER(coin) LIKE '%${lowercaseKey}%' `;
-                countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%' `;
-            }
-        }
-        getSetTargetQuery += " ORDER BY sale_date DESC";
-        let result = await connection.query(getSetTargetQuery);
-        let setTarget = result[0];
-        // Apply pagination if both page and perPage are provided
-        let total = 0;
-        if (page && perPage) {
-            const totalResult = await connection.query(countQuery);
-            total = parseInt(totalResult[0][0].total);
-
-            const start = (page - 1) * perPage;
-            getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
-        }
-
-        //get set_header_footer
-        for (let i = 0; i < setTarget.length; i++) {
-            const element = setTarget[i];
-
-            let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-            LEFT JOIN target_status ts
-            ON ts.target_id = stf.target_id
-            LEFT JOIN complition_status cs
-            ON cs.complition_id = stf.complition_id 
-            WHERE stf.sale_target_id = ${element.sale_target_id} AND
-            stf. untitled_id = ${untitledId}`;
-            setFooterResult = await connection.query(setFooterQuery);
-            setTarget[i]['footer'] = setFooterResult[0].reverse();
-        }
-
-        const data = {
-            status: 200,
-            message: "Set Target retrieved successfully",
-            data: setTarget,
-        };
-        // Add pagination information if provided
-        if (page && perPage) {
-            data.pagination = {
-                per_page: perPage,
-                total: total,
-                current_page: page,
-                last_page: Math.ceil(total / perPage),
-            };
-        }
-        return res.status(200).json(data);
-    } catch (error) {
-        return error500(error, res);
-    } finally {
-        if (connection) connection.release();
-    }
-};
-
-// Set Target Download
-const getSetTargetDownload = async (req, res) => {
-    const untitledId = req.companyData.untitled_id;
-    const { key } = req.query;
 
     // Attempt to obtain a database connection
     let connection = await getConnection();
     try {
-        // Start a transaction
+        // Start the transaction
         await connection.beginTransaction();
 
         let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
@@ -664,93 +589,272 @@ const getSetTargetDownload = async (req, res) => {
                 countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
             }
         }
-        getSetTargetQuery += " ORDER BY sale_date DESC";
-
+        getSetTargetQuery += " ORDER BY market_cap DESC";
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
-        // Prepare flattened data for Excel
-        let flattenedData = [];
+        // Apply pagination if both page and perPage are provided
+        let total = 0;
+        if (page && perPage) {
+            const totalResult = await connection.query(countQuery);
+            total = parseInt(totalResult[0][0].total);
 
+            const start = (page - 1) * perPage;
+            getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+        }
+
+        // Get set_header_footer
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
-            
-            // Fetch footer data for each sale_target
-            const setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-            LEFT JOIN target_status ts
-            ON ts.target_id = stf.target_id
-            LEFT JOIN complition_status cs
-            ON cs.complition_id = stf.complition_id 
-            WHERE stf.sale_target_id = ${element.sale_target_id} AND
-            stf. untitled_id = ${untitledId}`;
-            const setFooterResult = await connection.query(setFooterQuery);
-            const setFooterResultReverse = setFooterResult[0].reverse();
-            // If there are footer rows, add each to the flattenedData array
-            if (setFooterResultReverse.length > 0) {
-                setFooterResultReverse.forEach((footer) => {
-                    flattenedData.push({
-                        sale_target_id: element.sale_target_id,
-                        sale_date: element.sale_date,
-                        coin: element.coin,
-                        base_price: element.base_price,
-                        currant_price: element.currant_price,
-                        market_cap : element.market_cap,
-                        current_return_x : element.current_return_x,
-                        current_value : element.current_value,
-                        return_x: element.return_x,
-                        final_sale_price: element.final_sale_price,
-                        available_coins: element.available_coins,
-                        timeframe : element.timeframe,
-                        fdv_ratio : element.fdv_ratio,
-                        sale_target_coin: footer.sale_target_coin,
-                        sale_target: footer.sale_target,
-                        target_status: footer.target_status,
-                        complition_status: footer.complition_status,
-                        footer_percent: footer.sale_target_percent,
-                    });
-                });
-            }
-        }
 
-        if (flattenedData.length === 0) {
-            return error422("No data found.", res);
-        }
+            // Query to fetch data from current_price table if available
+            let currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
+            let currentPriceResult = await connection.query(currentPriceQuery);
+            let currentPriceData = currentPriceResult[0][0]; // First result
 
-        // Create a new workbook
-        const workbook = xlsx.utils.book_new();
-
-        // Create a worksheet and add flattened data to it
-        const worksheet = xlsx.utils.json_to_sheet(flattenedData);
-
-        // Add the worksheet to the workbook
-        xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
-
-        // Create a unique file name (e.g., based on timestamp)
-        const excelFileName = `exported_data_${Date.now()}.xlsx`;
-
-        // Write the workbook to a file
-        xlsx.writeFile(workbook, excelFileName);
-
-        // Send the file to the client for download
-        res.download(excelFileName, (err) => {
-            if (err) {
-                // Handle any errors that occur during download
-                console.error(err);
-                res.status(500).send("Error downloading the file.");
+            if (currentPriceData) {
+                // If data exists in current_price, use that and exclude sale_target_header data
+                setTarget[i].update_current_price = currentPriceData.current_price;
+                setTarget[i].market_cap = currentPriceData.market_cap;
+                setTarget[i].current_value = currentPriceData.current_value;
+                setTarget[i].fdv_ratio = currentPriceData.fdv_ratio;
+                setTarget[i].current_return_x = currentPriceData.current_return_x;
             } else {
-                // Delete the file after it's been sent
-                fs.unlinkSync(excelFileName);
+                // If no data found in current_price, use sale_target_header values
+                setTarget[i].current_price = element.current_price;
+                setTarget[i].market_cap = element.market_cap;
+                setTarget[i].current_value = element.current_value;
+                setTarget[i].fdv_ratio = element.fdv_ratio;
+                setTarget[i].current_return_x = element.current_return_x;
             }
-        });
 
-        // Commit the transaction
-        await connection.commit();
+            // Fetch footer data
+            let setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
+                WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ${untitledId}`;
+            let setFooterResult = await connection.query(setFooterQuery);
+            setTarget[i]['footer'] = setFooterResult[0].reverse();
+        }
+
+        // Updated totalCurrentValue query
+        const getTotalCurrentValueQuery = `
+          SELECT (
+            COALESCE(
+              (SELECT SUM(current_value) 
+               FROM current_price 
+               WHERE untitled_id = ? AND status = 1),
+              0
+            ) 
+            + 
+            COALESCE(
+              (SELECT SUM(sh.current_value)
+               FROM sale_target_header sh
+               WHERE NOT EXISTS (
+                 SELECT 1 
+                 FROM current_price c 
+                 WHERE c.ticker = sh.ticker
+               ) 
+               AND sh.untitled_id = ? AND sh.status = 1),
+              0
+            )
+          ) AS totalCurrentValue
+        `;
+
+        // Get total current value
+        let totalCurrentValueResult = await connection.query(getTotalCurrentValueQuery, [untitledId, untitledId]);
+        let totalCurrentValue = totalCurrentValueResult[0][0].totalCurrentValue;
+
+        const data = {
+            status: 200,
+            message: "Set Target retrieved successfully",
+            data: setTarget,
+            totalCurrentValue: totalCurrentValue, // Add total current value to the response
+        };
+
+        // Add pagination information if provided
+        if (page && perPage) {
+            data.pagination = {
+                per_page: perPage,
+                total: total,
+                current_page: page,
+                last_page: Math.ceil(total / perPage),
+            };
+        }
+
+        return res.status(200).json(data);
     } catch (error) {
         return error500(error, res);
     } finally {
         if (connection) connection.release();
     }
 };
+
+
+
+
+// Set Target Download
+const getSetTargetDownload = async (req, res) => {
+    const untitledId = req.companyData.untitled_id;
+    const { key } = req.query;
+  
+    let connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+      let flattenedData = [];
+    //   let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+    //   let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+  
+    //   if (key) {
+    //     const lowercaseKey = key.toLowerCase().trim();
+    //     if (lowercaseKey === "activated") {
+    //       getSetTargetQuery += ` AND status = 1`;
+    //       countQuery += ` AND status = 1`;
+    //     } else if (lowercaseKey === "deactivated") {
+    //       getSetTargetQuery += ` AND status = 0`;
+    //       countQuery += ` AND status = 0`;
+    //     } else {
+    //       getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+    //       countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+    //     }
+    //   }
+    //   getSetTargetQuery += " ORDER BY sale_date DESC";
+  
+    //   let result = await connection.query(getSetTargetQuery);
+    //   let setTarget = result[0];
+  
+    //   let flattenedData = [];
+  
+    //   for (let i = 0; i < setTarget.length; i++) {
+    //     const element = setTarget[i];
+  
+    //     const currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
+    //     const currentPriceResult = await connection.query(currentPriceQuery);
+  
+    //     let currentPriceData = currentPriceResult[0];
+    //     const currantPrice = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].currant_price : element.currant_price;
+    //     const marketCap = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].market_cap : element.market_cap;
+    //     const currentValue = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].current_value : element.current_value;
+    //     const fdvRatio = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].fdv_ratio : element.fdv_ratio;
+    //     const currentReturnX = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].current_return_x : element.current_return_x;
+  
+    //     const setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf 
+    //       LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+    //       LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+    //       WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ${untitledId}`;
+    //     const setFooterResult = await connection.query(setFooterQuery);
+    //     const setFooterResultReverse = setFooterResult[0].reverse();
+  
+    //     if (setFooterResultReverse.length > 0) {
+    //       setFooterResultReverse.forEach((footer) => {
+    //         flattenedData.push({
+    //           report_date: element.sale_date,
+    //           coin: element.coin,
+    //           exchange: element.exchange,
+    //           base_price: element.base_price,
+    //           currant_price: currantPrice,
+    //           market_cap: marketCap,
+    //           target_return_x: element.return_x,
+    //           current_return_x: currentReturnX,
+    //           current_value: currentValue,
+    //           final_sale_price: element.final_sale_price,
+    //           total_coins: element.available_coins,
+    //           major_unlock_date: element.timeframe,
+    //           fdv_ratio: fdvRatio,
+    //           sale_price_coin: footer.sale_target_coin,
+    //           sale_price: footer.sale_target,
+    //           target_status: footer.target_status,
+    //           complition_status: footer.complition_status,
+    //           footer_percent: footer.sale_target_percent,
+    //         });
+    //       });
+    //     }
+    //   }
+    let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+
+    if (key) {
+        const lowercaseKey = key.toLowerCase().trim();
+        if (lowercaseKey === "activated") {
+            getSetTargetQuery += ` AND status = 1`;
+        } else if (lowercaseKey === "deactivated") {
+            getSetTargetQuery += ` AND status = 0`;
+        } else {
+            getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+        }
+    }
+    getSetTargetQuery += " ORDER BY market_cap DESC";
+    let result = await connection.query(getSetTargetQuery);
+    let setTarget = result[0];
+
+
+
+    // Get set_header_footer
+    for (let i = 0; i < setTarget.length; i++) {
+        const element = setTarget[i];
+
+        // Query to fetch data from current_price table if available
+        let currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
+        let currentPriceResult = await connection.query(currentPriceQuery);
+        let currentPriceData = currentPriceResult[0][0]; // First result
+
+        if (currentPriceData) {
+            // If data exists in current_price, use that and exclude sale_target_header data
+            setTarget[i].update_current_price = currentPriceData.current_price;
+            setTarget[i].market_cap = currentPriceData.market_cap;
+            setTarget[i].current_value = currentPriceData.current_value;
+            setTarget[i].fdv_ratio = currentPriceData.fdv_ratio;
+            setTarget[i].current_return_x = currentPriceData.current_return_x;
+        } else {
+            // If no data found in current_price, use sale_target_header values
+            setTarget[i].current_price = element.current_price;
+            setTarget[i].market_cap = element.market_cap;
+            setTarget[i].current_value = element.current_value;
+            setTarget[i].fdv_ratio = element.fdv_ratio;
+            setTarget[i].current_return_x = element.current_return_x;
+        }
+
+        // Fetch footer data
+        let setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf
+            LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+            LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
+            WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ${untitledId}`;
+        let setFooterResult = await connection.query(setFooterQuery);
+        setTarget[i]['footer'] = setFooterResult[0].reverse();
+    }
+    // return res.status(200).json(setTarget)
+    flattenedData = setTarget
+  
+      if (flattenedData.length === 0) {
+        return error422("No data found.", res);
+      }
+  
+      const workbook = xlsx.utils.book_new();
+      const worksheet = xlsx.utils.json_to_sheet(flattenedData);
+      xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
+  
+      const excelFileName = `exported_data_${Date.now()}.xlsx`;
+      xlsx.writeFile(workbook, excelFileName);
+  
+      res.download(excelFileName, (err) => {
+        if (err) {
+          console.error(err);
+          res.status(500).send("Error downloading the file.");
+        } else {
+          fs.unlinkSync(excelFileName); // Consider using fs.promises.unlink for async deletion
+        }
+      });
+  
+      await connection.commit();
+    } catch (error) {
+      
+        
+      return error500(error, res);
+    } finally {
+      if (connection) connection.release();
+    }
+  };
+  
+  
 
 
 const updateSellSold = async (req, res) => {
@@ -1073,7 +1177,7 @@ const getSetTargetReached = async (req, res) => {
         // Base queries
         let getSetTargetQuery = `
             SELECT * FROM sale_target_header 
-            WHERE untitled_id = ${untitledId} AND status = 1`
+            WHERE untitled_id = ${untitledId} AND status = 1`;
 
         // Add search/filtering if a key is provided
         if (key) {
@@ -1087,18 +1191,18 @@ const getSetTargetReached = async (req, res) => {
             }
         }
 
-        getSetTargetQuery += " ORDER BY sale_date DESC";
+        // Order by market_cap in descending order
+        getSetTargetQuery += " ORDER BY market_cap DESC";
 
         // Fetch the header data
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
-        // Filter headers based on footer data
-        let filteredData = [];
+        // Loop over the setTarget to fetch footer and current_price data
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
 
-            // Fetch all footer data for the current header
+            // Query for footer data
             let setFooterQuery = `
                 SELECT stf.*, ts.target_status, cs.complition_status 
                 FROM set_target_footer stf
@@ -1106,15 +1210,42 @@ const getSetTargetReached = async (req, res) => {
                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
                 WHERE stf.sale_target_id = ${element.sale_target_id} 
                 AND stf.untitled_id = ${untitledId}`;
-
             const setFooterResult = await connection.query(setFooterQuery);
+            element['footer'] = setFooterResult[0].reverse();
+
+            // Query for current_price data based on sale_target_id
+            let currentPriceQuery = `
+                SELECT current_price AS update_current_price, market_cap, current_value, fdv_ratio, current_return_x 
+                FROM current_price 
+                WHERE sale_target_id = ${element.sale_target_id}`;
+            const currentPriceResult = await connection.query(currentPriceQuery);
+
+            // If current_price data is available, use it; otherwise, fallback to sale_target_header data
+            if (currentPriceResult[0] && currentPriceResult[0].length > 0) {
+                element['current_price'] = currentPriceResult[0][0].current_price;
+                element['market_cap'] = currentPriceResult[0][0].market_cap;
+                element['current_value'] = currentPriceResult[0][0].current_value;
+                element['fdv_ratio'] = currentPriceResult[0][0].fdv_ratio;
+                element['current_return_x'] = currentPriceResult[0][0].current_return_x;
+            } else {
+                element['current_price'] = element.current_price;
+                element['market_cap'] = element.market_cap;
+                element['current_value'] = element.current_value;
+                element['fdv_ratio'] = element.fdv_ratio;
+                element['current_return_x'] = element.current_return_x;
+            }
+        }
+
+        // Filter headers based on footer data
+        let filteredData = [];
+        for (let i = 0; i < setTarget.length; i++) {
+            const element = setTarget[i];
 
             // Check if at least one footer record has `target_id = 2`
-            const hasTargetId2 = setFooterResult[0].some((footer) => footer.target_id === 2);
+            const hasTargetId2 = element.footer.some((footer) => footer.target_id === 2);
 
             // Include the header only if `target_id = 2` exists, along with all footer data
             if (hasTargetId2) {
-                element['footer'] = setFooterResult[0].reverse(); // Include all footer data
                 filteredData.push(element);
             }
         }
@@ -1155,6 +1286,7 @@ const getSetTargetReached = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
 
 //Get Sold Coin
 const getSoldCoin = async (req, res) => {
@@ -1274,15 +1406,18 @@ const getSoldCoinDownload = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { key } = req.query;
 
-    // Attempt to obtain a database connection
     let connection = await getConnection();
     try {
-        // Start a transaction
         await connection.beginTransaction();
 
         let getSoldCoinQuery = `
-            SELECT sc.*, sf.sale_target_coin, 
-            (sc.sold_current_price * sf.sale_target_coin) AS total 
+            SELECT 
+                sc.created_at AS sold_date, 
+                sc.coin,
+                sc.base_price,
+                sc.sold_current_price, 
+                sf.sale_target_coin AS sold_coins, 
+                (sc.sold_current_price * sf.sale_target_coin) AS total
             FROM sold_coin sc
             LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
             WHERE sc.untitled_id = ${untitledId}`;
@@ -1303,55 +1438,44 @@ const getSoldCoinDownload = async (req, res) => {
         let result = await connection.query(getSoldCoinQuery);
         let soldCoin = result[0];
 
-        const data = {
-            status: 200,
-            message: "Sold Coin retrieved successfully",
-            data: soldCoin ,
-        };
-
-        // Prepare flattened data for Excel
-        
-        if (data.length === 0) {
+        if (soldCoin.length === 0) {
             return error422("No data found.", res);
         }
 
         // Create a new workbook
         const workbook = xlsx.utils.book_new();
         
-        // Create a worksheet and add flattened data to it
+        // Create a worksheet and add only required columns
         const worksheet = xlsx.utils.json_to_sheet(soldCoin);
         
         // Add the worksheet to the workbook
         xlsx.utils.book_append_sheet(workbook, worksheet, "SoldCoinInfo");
 
-        // Create a unique file name (e.g., based on timestamp)
+        // Create a unique file name
         const excelFileName = `exported_data_${Date.now()}.xlsx`;
         
         // Write the workbook to a file
         xlsx.writeFile(workbook, excelFileName);
 
-        // Send the file to the client for download
+        // Send the file to the client
         res.download(excelFileName, (err) => {
             if (err) {
-                // Handle any errors that occur during download
                 console.error(err);
                 res.status(500).send("Error downloading the file.");
             } else {
-                // Delete the file after it's been sent
                 fs.unlinkSync(excelFileName);
             }
         });
 
-        // Commit the transaction
         await connection.commit();
     } catch (error) {
-        
-        
         return error500(error, res);
     } finally {
         if (connection) connection.release();
     }
 };
+
+
 
 const getDashboardDownload = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
@@ -1409,18 +1533,18 @@ const getDashboardDownload = async (req, res) => {
             if (hasTargetId2) {
                 for (let footer of footerRows) {
                     filteredData.push({
-                        sale_target_id: element.sale_target_id,
-                        sale_date: element.sale_date,
+                        target_date: element.sale_date,
                         coin: element.coin,
+                        exchange:element.exchange,
                         base_price: element.base_price,
                         currant_price: element.currant_price,
                         market_cap : element.market_cap,
+                        target_return_x: element.return_x,
                         current_return_x : element.current_return_x,
                         current_value : element.current_value,
-                        return_x: element.return_x,
                         final_sale_price: element.final_sale_price,
-                        available_coins: element.available_coins,
-                        timeframe : element.timeframe,
+                        total_coins: element.available_coins,
+                        major_unlock_date : element.timeframe,
                         fdv_ratio : element.fdv_ratio,
                         sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
