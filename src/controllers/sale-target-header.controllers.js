@@ -126,8 +126,10 @@ const addSaleTargetHeader = async (req, res) => {
     const return_x = parseFloat(req.body.return_x) || 0;
     const final_sale_price = parseFloat(req.body.final_sale_price) || 0;
     const available_coins = parseFloat(req.body.available_coins) || 0;
+    const total_available_coins = req.body.available_coins || '';
     const timeframe = req.body.timeframe || '';
     const fdv_ratio = req.body.fdv_ratio || '';
+    const narrative = req.body.narrative || '';
     const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
 
@@ -163,12 +165,12 @@ const addSaleTargetHeader = async (req, res) => {
         const insertSaleTargetHeaderQuery = `
             INSERT INTO sale_target_header (
                 ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
-                market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                market_cap, return_x, final_sale_price, available_coins, total_available_coins, timeframe, fdv_ratio, narrative, untitled_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         const insertSaleTargetHeaderValues = [
             ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
-            market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, untitled_id
+            market_cap, return_x, final_sale_price, available_coins, total_available_coins, timeframe, fdv_ratio, narrative, untitled_id
         ];
 
         const [insertSaleTargetHeaderResult] = await connection.query(insertSaleTargetHeaderQuery, insertSaleTargetHeaderValues);
@@ -697,163 +699,168 @@ const getSetTargets = async (req, res) => {
 const getSetTargetDownload = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
     const { key } = req.query;
-  
+
+    if (!untitledId) {
+        return res.status(400).send("Invalid untitledId.");
+    }
+
     let connection = await getConnection();
     try {
-      await connection.beginTransaction();
-      let flattenedData = [];
-    //   let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-    //   let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
-  
-    //   if (key) {
-    //     const lowercaseKey = key.toLowerCase().trim();
-    //     if (lowercaseKey === "activated") {
-    //       getSetTargetQuery += ` AND status = 1`;
-    //       countQuery += ` AND status = 1`;
-    //     } else if (lowercaseKey === "deactivated") {
-    //       getSetTargetQuery += ` AND status = 0`;
-    //       countQuery += ` AND status = 0`;
-    //     } else {
-    //       getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-    //       countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-    //     }
-    //   }
-    //   getSetTargetQuery += " ORDER BY sale_date DESC";
-  
-    //   let result = await connection.query(getSetTargetQuery);
-    //   let setTarget = result[0];
-  
-    //   let flattenedData = [];
-  
-    //   for (let i = 0; i < setTarget.length; i++) {
-    //     const element = setTarget[i];
-  
-    //     const currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
-    //     const currentPriceResult = await connection.query(currentPriceQuery);
-  
-    //     let currentPriceData = currentPriceResult[0];
-    //     const currantPrice = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].currant_price : element.currant_price;
-    //     const marketCap = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].market_cap : element.market_cap;
-    //     const currentValue = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].current_value : element.current_value;
-    //     const fdvRatio = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].fdv_ratio : element.fdv_ratio;
-    //     const currentReturnX = currentPriceData && currentPriceData.length > 0 ? currentPriceData[0].current_return_x : element.current_return_x;
-  
-    //     const setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf 
-    //       LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-    //       LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
-    //       WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ${untitledId}`;
-    //     const setFooterResult = await connection.query(setFooterQuery);
-    //     const setFooterResultReverse = setFooterResult[0].reverse();
-  
-    //     if (setFooterResultReverse.length > 0) {
-    //       setFooterResultReverse.forEach((footer) => {
-    //         flattenedData.push({
-    //           report_date: element.sale_date,
-    //           coin: element.coin,
-    //           exchange: element.exchange,
-    //           base_price: element.base_price,
-    //           currant_price: currantPrice,
-    //           market_cap: marketCap,
-    //           target_return_x: element.return_x,
-    //           current_return_x: currentReturnX,
-    //           current_value: currentValue,
-    //           final_sale_price: element.final_sale_price,
-    //           total_coins: element.available_coins,
-    //           major_unlock_date: element.timeframe,
-    //           fdv_ratio: fdvRatio,
-    //           sale_price_coin: footer.sale_target_coin,
-    //           sale_price: footer.sale_target,
-    //           target_status: footer.target_status,
-    //           complition_status: footer.complition_status,
-    //           footer_percent: footer.sale_target_percent,
-    //         });
-    //       });
-    //     }
-    //   }
-    let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE untitled_id = ${untitledId} AND status = 1`;
+        await connection.beginTransaction();
 
-    if (key) {
-        const lowercaseKey = key.toLowerCase().trim();
-        if (lowercaseKey === "activated") {
-            getSetTargetQuery += ` AND status = 1`;
-        } else if (lowercaseKey === "deactivated") {
-            getSetTargetQuery += ` AND status = 0`;
-        } else {
-            getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
-        }
-    }
-    getSetTargetQuery += " ORDER BY market_cap DESC";
-    let result = await connection.query(getSetTargetQuery);
-    let setTarget = result[0];
+        let getSetTargetQuery = `
+            SELECT sth.sale_target_id, sth.sale_date AS target_date, sth.coin AS coins, sth.exchange, sth.base_price,  
+                   COALESCE(cp.current_price, sth.currant_price) AS currant_price,
+                   COALESCE(cp.market_cap, sth.market_cap) AS market_cap,
+                   sth.return_x AS target_return_x,
+                   COALESCE(cp.current_return_x, sth.current_return_x) AS current_return_x,
+                   COALESCE(cp.current_value, sth.current_value) AS current_value,
+                   sth.final_sale_price,
+                   sth.available_coins AS total_coins,
+                   sth.timeframe AS major_unlock_date,
+                   COALESCE(cp.fdv_ratio, sth.fdv_ratio) AS fdv,
+                   sth.narrative
+            FROM sale_target_header sth
+            LEFT JOIN current_price cp ON sth.sale_target_id = cp.sale_target_id
+            WHERE sth.untitled_id = ${untitledId}
+        `;
 
-
-
-    // Get set_header_footer
-    for (let i = 0; i < setTarget.length; i++) {
-        const element = setTarget[i];
-
-        // Query to fetch data from current_price table if available
-        let currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
-        let currentPriceResult = await connection.query(currentPriceQuery);
-        let currentPriceData = currentPriceResult[0][0]; // First result
-
-        if (currentPriceData) {
-            // If data exists in current_price, use that and exclude sale_target_header data
-            setTarget[i].update_current_price = currentPriceData.current_price;
-            setTarget[i].market_cap = currentPriceData.market_cap;
-            setTarget[i].current_value = currentPriceData.current_value;
-            setTarget[i].fdv_ratio = currentPriceData.fdv_ratio;
-            setTarget[i].current_return_x = currentPriceData.current_return_x;
-        } else {
-            // If no data found in current_price, use sale_target_header values
-            setTarget[i].current_price = element.current_price;
-            setTarget[i].market_cap = element.market_cap;
-            setTarget[i].current_value = element.current_value;
-            setTarget[i].fdv_ratio = element.fdv_ratio;
-            setTarget[i].current_return_x = element.current_return_x;
+        if (key) {
+            const lowercaseKey = key.toLowerCase().trim();
+            if (lowercaseKey === "activated") {
+                getSetTargetQuery += ` AND sth.status = 1`;
+            } else if (lowercaseKey === "deactivated") {
+                getSetTargetQuery += ` AND sth.status = 0`;
+            } else {
+                getSetTargetQuery += ` AND LOWER(sth.coin) LIKE '%${lowercaseKey}%'`;
+            }
         }
 
-        // Fetch footer data
-        let setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf
-            LEFT JOIN target_status ts ON ts.target_id = stf.target_id
-            LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
-            WHERE stf.sale_target_id = ${element.sale_target_id} AND stf.untitled_id = ${untitledId}`;
-        let setFooterResult = await connection.query(setFooterQuery);
-        setTarget[i]['footer'] = setFooterResult[0].reverse();
-    }
-    // return res.status(200).json(setTarget)
-    flattenedData = setTarget
-  
-      if (flattenedData.length === 0) {
-        return error422("No data found.", res);
-      }
-  
-      const workbook = xlsx.utils.book_new();
-      const worksheet = xlsx.utils.json_to_sheet(flattenedData);
-      xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
-  
-      const excelFileName = `exported_data_${Date.now()}.xlsx`;
-      xlsx.writeFile(workbook, excelFileName);
-  
-      res.download(excelFileName, (err) => {
-        if (err) {
-          console.error(err);
-          res.status(500).send("Error downloading the file.");
-        } else {
-          fs.unlinkSync(excelFileName); // Consider using fs.promises.unlink for async deletion
+        getSetTargetQuery += " ORDER BY COALESCE(cp.market_cap, sth.market_cap) DESC";
+
+        let [setTarget] = await connection.query(getSetTargetQuery);
+
+        if (setTarget.length === 0) {
+            return error422("No data found.", res);
         }
-      });
-  
-      await connection.commit();
+
+        const saleTargetIds = setTarget.map(item => item.sale_target_id);
+        let setFooterResult = [];
+
+        if (saleTargetIds.length > 0) {
+            let setFooterQuery = `
+                SELECT 
+                    stf.sale_target_id, 
+                    stf.sale_target_coin, 
+                    stf.sale_target, 
+                    ts.target_status, 
+                    cs.complition_status, 
+                    stf.sale_target_percent
+                FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
+                WHERE stf.untitled_id = ? AND stf.sale_target_id IN (${saleTargetIds.join(',')})
+                ORDER BY stf.sale_target_id ASC
+            `;
+
+            [setFooterResult] = await connection.query(setFooterQuery, [untitledId]);
+        }
+
+        let footerMap = {};
+        setFooterResult.forEach(footer => {
+            if (!footerMap[footer.sale_target_id]) {
+                footerMap[footer.sale_target_id] = [];
+            }
+            footerMap[footer.sale_target_id].push({
+                sale_target_coin: footer.sale_target_coin,
+                sale_target: footer.sale_target,
+                target_status: footer.target_status,
+                complition_status: footer.complition_status,
+                footer_percent: footer.sale_target_percent
+            });
+        });
+
+        let flattenedData = [];
+        setTarget.forEach(target => {
+            let footers = footerMap[target.sale_target_id] || [];
+
+            if (footers.length === 0) {
+                flattenedData.push({
+                    target_date: target.target_date,
+                    coin: target.coins,
+                    exchange: target.exchange,
+                    base_price: target.base_price,
+                    currant_price: target.currant_price,
+                    market_cap: target.market_cap,
+                    target_return_x: target.target_return_x,
+                    current_return_x: target.current_return_x,
+                    current_value: target.current_value,
+                    final_sale_price: target.final_sale_price,
+                    total_coins: target.total_coins,
+                    major_unlock_date: target.major_unlock_date,
+                    fdv: target.fdv,
+                    narrative: target.narrative,
+                    sale_target_coin: null,
+                    sale_target: null,
+                    target_status: null,
+                    complition_status: null,
+                    footer_percent: null,
+                });
+            } else {
+                footers.forEach(footer => {
+                    flattenedData.push({
+                        target_date: target.target_date,
+                        coin: target.coins,
+                        exchange: target.exchange,
+                        base_price: target.base_price,
+                        currant_price: target.currant_price,
+                        market_cap: target.market_cap,
+                        target_return_x: target.target_return_x,
+                        current_return_x: target.current_return_x,
+                        current_value: target.current_value,
+                        final_sale_price: target.final_sale_price,
+                        total_coins: target.total_coins,
+                        major_unlock_date: target.major_unlock_date,
+                        fdv: target.fdv,
+                        narrative: target.narrative,
+                        sale_target_coin: footer.sale_target_coin,
+                        sale_target: footer.sale_target,
+                        target_status: footer.target_status,
+                        complition_status: footer.complition_status,
+                        footer_percent: footer.footer_percent,
+                    });
+                });
+            }
+        });
+
+        const workbook = xlsx.utils.book_new();
+        const worksheet = xlsx.utils.json_to_sheet(flattenedData);
+        xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
+
+        const excelFileName = `exported_data_${Date.now()}.xlsx`;
+        xlsx.writeFile(workbook, excelFileName);
+
+        res.download(excelFileName, (err) => {
+            if (err) {
+                console.error(err);
+                res.status(500).send("Error downloading the file.");
+            } else {
+                fs.unlinkSync(excelFileName);
+            }
+        });
+
+        await connection.commit();
     } catch (error) {
-      
-        
-      return error500(error, res);
+        await connection.rollback();
+        return error500(error, res);
     } finally {
-      if (connection) connection.release();
+        if (connection) connection.release();
     }
-  };
-  
+};
+
+
+
+
   
 
 
@@ -967,6 +974,7 @@ const updateSetTarget = async (req, res) => {
     const available_coins = req.body.available_coins ? req.body.available_coins : '';
     const timeframe = req.body.timeframe ? req.body.timeframe : '';
     const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : '';
+    const narrative = req.body.narrative ? req.body.narrative : '';
     const setTargetFooter = req.body.setTargetFooter ? req.body.setTargetFooter : [];
     const untitled_id = req.companyData.untitled_id;
     if (!coin) {
@@ -994,8 +1002,8 @@ const updateSetTarget = async (req, res) => {
         await connection.beginTransaction();
 
         // Update Sale Target Header
-        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ? WHERE sale_target_id = ? AND untitled_id = ?`;
-        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, exchange, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, sale_target_id, untitled_id]);
+        const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ?, narrative = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+        await connection.query(updatesaleTargetHeaderQuery, [ticker, coin, exchange, currant_price, current_value, current_return_x, market_cap, return_x, final_sale_price, available_coins, timeframe, fdv_ratio, narrative, sale_target_id, untitled_id]);
 
         // Update set target footer
         let setTargetFooterArray = setTargetFooter.reverse();
@@ -1298,18 +1306,26 @@ const getSoldCoin = async (req, res) => {
         // Start the transaction
         await connection.beginTransaction();
 
-        // Query to get sold coin data with calculated total
+        // Query to get sold coin data with calculated total and available_coins (total_coins - sale_target_coin)
         let getSoldCoinQuery = `
-            SELECT sc.*, sf.sale_target_coin, 
-            (sc.sold_current_price * sf.sale_target_coin) AS total 
+            SELECT 
+                sc.*, 
+                sf.sale_target_coin, 
+                    sth.available_coins AS total_coins, 
+    sth.available_coins - SUM(sf.sale_target_coin) OVER (PARTITION BY sf.sale_target_id ORDER BY sc.created_at) AS available_coins,
+                (sc.sold_current_price * sf.sale_target_coin) AS total 
             FROM sold_coin sc
             LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            LEFT JOIN sale_target_header sth ON sf.sale_target_id = sth.sale_target_id
             WHERE sc.untitled_id = ${untitledId}`;
+          
+
 
         let countQuery = `
             SELECT COUNT(*) AS total 
             FROM sold_coin sc
             LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            LEFT JOIN sale_target_header sth ON sf.sale_target_id = sth.sale_target_id
             WHERE sc.untitled_id = ${untitledId}`;
 
         // Filtering by key if provided
@@ -1370,6 +1386,8 @@ const getSoldCoin = async (req, res) => {
     }
 };
 
+
+
 //current price 
 const getCurrentPriceCount = async (req, res) => {
     const untitledId = req.companyData.untitled_id;
@@ -1411,16 +1429,19 @@ const getSoldCoinDownload = async (req, res) => {
         await connection.beginTransaction();
 
         let getSoldCoinQuery = `
-            SELECT 
-                sc.created_at AS sold_date, 
-                sc.coin,
-                sc.base_price,
-                sc.sold_current_price, 
-                sf.sale_target_coin AS sold_coins, 
-                (sc.sold_current_price * sf.sale_target_coin) AS total
-            FROM sold_coin sc
-            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
-            WHERE sc.untitled_id = ${untitledId}`;
+           SELECT 
+    sc.created_at AS sold_date, 
+    sc.coin,
+    sc.base_price,
+    sc.sold_current_price, 
+    sth.available_coins AS total_coins, 
+    sf.sale_target_coin AS sold_coins, 
+    sth.available_coins - SUM(sf.sale_target_coin) OVER (PARTITION BY sf.sale_target_id ORDER BY sc.created_at) AS available_coins,
+    (sc.sold_current_price * sf.sale_target_coin) AS total
+FROM sold_coin sc
+LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+LEFT JOIN sale_target_header sth ON sf.sale_target_id = sth.sale_target_id
+WHERE sc.untitled_id = ${untitledId}`;
 
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
@@ -1487,9 +1508,22 @@ const getDashboardDownload = async (req, res) => {
         // Start a transaction
         await connection.beginTransaction();
 
-        let getSetTargetQuery = `
-            SELECT * FROM sale_target_header 
-            WHERE untitled_id = ${untitledId} AND status = 1`
+            let getSetTargetQuery = `
+            SELECT sth.sale_target_id, sth.sale_date, sth.coin, sth.exchange, sth.base_price,  
+                   COALESCE(cp.current_price, sth.currant_price) AS currant_price,
+                   COALESCE(cp.market_cap, sth.market_cap) AS market_cap,
+                   sth.return_x,
+                   COALESCE(cp.current_return_x, sth.current_return_x) AS current_return_x,
+                   COALESCE(cp.current_value, sth.current_value) AS current_value,
+                   sth.final_sale_price,
+                   sth.available_coins,
+                   sth.timeframe,
+                   COALESCE(cp.fdv_ratio, sth.fdv_ratio) AS fdv_ratio,
+                   sth.narrative
+            FROM sale_target_header sth
+            LEFT JOIN current_price cp ON sth.sale_target_id = cp.sale_target_id
+            WHERE sth.untitled_id = ${untitledId} AND sth.  status = 1
+        `;
 
         // Add search/filtering if a key is provided
         if (key) {
@@ -1546,6 +1580,7 @@ const getDashboardDownload = async (req, res) => {
                         total_coins: element.available_coins,
                         major_unlock_date : element.timeframe,
                         fdv_ratio : element.fdv_ratio,
+                        narrative:element.narrative,
                         sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
                         target_status: footer.target_status,
