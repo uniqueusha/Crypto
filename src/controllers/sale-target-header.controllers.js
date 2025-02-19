@@ -717,12 +717,13 @@ const getSetTargetDownload = async (req, res) => {
                    COALESCE(cp.current_value, sth.current_value) AS current_value,
                    sth.final_sale_price,
                    sth.available_coins AS total_coins,
+                   sth.total_available_coins,
                    sth.timeframe AS major_unlock_date,
                    COALESCE(cp.fdv_ratio, sth.fdv_ratio) AS fdv,
                    sth.narrative
             FROM sale_target_header sth
             LEFT JOIN current_price cp ON sth.sale_target_id = cp.sale_target_id
-            WHERE sth.untitled_id = ${untitledId}
+            WHERE sth.untitled_id = ${untitledId} AND sth.status = 1
         `;
 
         if (key) {
@@ -797,11 +798,12 @@ const getSetTargetDownload = async (req, res) => {
                     current_value: target.current_value,
                     final_sale_price: target.final_sale_price,
                     total_coins: target.total_coins,
+                    available_coins:target.total_available_coins,
                     major_unlock_date: target.major_unlock_date,
                     fdv: target.fdv,
                     narrative: target.narrative,
-                    sale_target_coin: null,
                     sale_target: null,
+                    sale_target_coin: null,
                     target_status: null,
                     complition_status: null,
                     footer_percent: null,
@@ -820,11 +822,12 @@ const getSetTargetDownload = async (req, res) => {
                         current_value: target.current_value,
                         final_sale_price: target.final_sale_price,
                         total_coins: target.total_coins,
+                        available_coins: target.total_available_coins,
                         major_unlock_date: target.major_unlock_date,
                         fdv: target.fdv,
                         narrative: target.narrative,
-                        sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
+                        sale_target_coin: footer.sale_target_coin,
                         target_status: footer.target_status,
                         complition_status: footer.complition_status,
                         footer_percent: footer.footer_percent,
@@ -879,16 +882,22 @@ const updateSellSold = async (req, res) => {
         const set_footer_id = req.body.set_footer_id || '';
         const coin = req.body.coin || '';
         const base_price = req.body.base_price ? parseFloat(req.body.base_price) : '';
-
+        const total_coins = req.body.total_coins ? parseFloat(req.body.total_coins) : '';
         // Fetch current footer details to confirm state
         const setFooterQuery = `
-            SELECT *
-            FROM set_target_footer 
-            WHERE sale_target_id = ? 
-            AND untitled_id = ? 
-            AND set_footer_id = ?`;
+            SELECT sf.*,sf.sale_target_coin,sh.available_coins,sh.total_available_coins
+            FROM set_target_footer sf 
+            LEFT JOIN sale_target_header sh
+            ON sf.sale_target_id = sh.sale_target_id
+            WHERE sf.sale_target_id = ? 
+            AND sf.untitled_id = ? 
+            AND sf.set_footer_id = ?`;
         const [footerResult] = await connection.query(setFooterQuery, [sale_target_id, untitledId, set_footer_id]);
-        
+         // Extract sale_target_coin value
+         const saleTargetCoin = footerResult[0].sale_target_coin || 0;
+
+         const available_coins = footerResult[0].available_coins || 0;
+         const total_available_coins = footerResult[0].total_available_coins || 0;
         // Only allow transitions from `complition_id = 3` 
         if (complition_id == 3) {
             const updateQuery = `
@@ -897,12 +906,28 @@ const updateSellSold = async (req, res) => {
                 WHERE sale_target_id = ? AND untitled_id = ? AND set_footer_id = ? AND complition_id = 3`;
             const [updateResult] =await connection.query(updateQuery, [sale_target_id, untitledId, set_footer_id]);
             
+          // Calculate available_coins
+          console.log('calculation total-sale coin',total_coins, saleTargetCoin);
+          
+          const update_total_available_coin = total_available_coins - saleTargetCoin;
+          console.log('result coin',available_coins);
+          
+        
             // Insert into `sold_coin` table
             const insertSoldCoinQuery = `
-                INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, untitled_id) 
-                VALUES (?, ?, ?, ?, ?)`;
-            const [insertSoldCoinResult] = await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, untitledId]);
+                INSERT INTO sold_coin (coin, set_footer_id, sold_current_price, base_price, total_coins, available_coins, untitled_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            const [insertSoldCoinResult] = await connection.query(insertSoldCoinQuery, [coin, set_footer_id, currant_price, base_price, available_coins, update_total_available_coin, untitledId]);
+
+              // Update `total_available_coins` in `sale_target_header`
+              const updateHeaderQuery = `
+              UPDATE sale_target_header
+              SET total_available_coins = ?
+              WHERE sale_target_id = ? 
+              AND untitled_id = ?`;
+          await connection.query(updateHeaderQuery, [update_total_available_coin, sale_target_id, untitledId]);
         } 
+
 
         // Commit the transaction
         await connection.commit();
@@ -1179,15 +1204,12 @@ const getSetTargetReached = async (req, res) => {
 
     let connection = await getConnection();
     try {
-        // Start the transaction
         await connection.beginTransaction();
 
-        // Base queries
         let getSetTargetQuery = `
             SELECT * FROM sale_target_header 
             WHERE untitled_id = ${untitledId} AND status = 1`;
 
-        // Add search/filtering if a key is provided
         if (key) {
             const lowercaseKey = key.toLowerCase().trim();
             if (lowercaseKey === "activated") {
@@ -1199,18 +1221,13 @@ const getSetTargetReached = async (req, res) => {
             }
         }
 
-        // Order by market_cap in descending order
         getSetTargetQuery += " ORDER BY market_cap DESC";
-
-        // Fetch the header data
         let result = await connection.query(getSetTargetQuery);
         let setTarget = result[0];
 
-        // Loop over the setTarget to fetch footer and current_price data
         for (let i = 0; i < setTarget.length; i++) {
             const element = setTarget[i];
 
-            // Query for footer data
             let setFooterQuery = `
                 SELECT stf.*, ts.target_status, cs.complition_status 
                 FROM set_target_footer stf
@@ -1221,20 +1238,19 @@ const getSetTargetReached = async (req, res) => {
             const setFooterResult = await connection.query(setFooterQuery);
             element['footer'] = setFooterResult[0].reverse();
 
-            // Query for current_price data based on sale_target_id
             let currentPriceQuery = `
                 SELECT current_price AS update_current_price, market_cap, current_value, fdv_ratio, current_return_x 
                 FROM current_price 
                 WHERE sale_target_id = ${element.sale_target_id}`;
             const currentPriceResult = await connection.query(currentPriceQuery);
+            const currentPriceData = currentPriceResult[0][0];
 
-            // If current_price data is available, use it; otherwise, fallback to sale_target_header data
-            if (currentPriceResult[0] && currentPriceResult[0].length > 0) {
-                element['current_price'] = currentPriceResult[0][0].current_price;
-                element['market_cap'] = currentPriceResult[0][0].market_cap;
-                element['current_value'] = currentPriceResult[0][0].current_value;
-                element['fdv_ratio'] = currentPriceResult[0][0].fdv_ratio;
-                element['current_return_x'] = currentPriceResult[0][0].current_return_x;
+            if (currentPriceData) {
+                element['update_current_price'] = currentPriceData.update_current_price;
+                element['market_cap'] = currentPriceData.market_cap;
+                element['current_value'] = currentPriceData.current_value;
+                element['fdv_ratio'] = currentPriceData.fdv_ratio;
+                element['current_return_x'] = currentPriceData.current_return_x;
             } else {
                 element['current_price'] = element.current_price;
                 element['market_cap'] = element.market_cap;
@@ -1244,40 +1260,26 @@ const getSetTargetReached = async (req, res) => {
             }
         }
 
-        // Filter headers based on footer data
-        let filteredData = [];
-        for (let i = 0; i < setTarget.length; i++) {
-            const element = setTarget[i];
+        let filteredData = setTarget.filter(element => 
+            element.footer.some(footer => footer.target_id === 2)
+        );
 
-            // Check if at least one footer record has `target_id = 2`
-            const hasTargetId2 = element.footer.some((footer) => footer.target_id === 2);
-
-            // Include the header only if `target_id = 2` exists, along with all footer data
-            if (hasTargetId2) {
-                filteredData.push(element);
-            }
-        }
-
-        // Calculate the total count based on the filtered data
         const total = filteredData.length;
-        let FilteredData = filteredData;
+        let paginatedData = filteredData;
 
-        // Apply pagination to the filtered data
         if (page && perPage) {
             const start = (page - 1) * perPage;
-            FilteredData = filteredData.slice(start, start + parseInt(perPage, 10));
+            paginatedData = filteredData.slice(start, start + parseInt(perPage, 10));
         }
 
-        // Build the response object
-        const data = {
+        const responseData = {
             status: 200,
             message: "Set Target retrieved successfully",
-            data: FilteredData,
+            data: paginatedData,
         };
 
-        // Add pagination information if applicable
         if (page && perPage) {
-            data.pagination = {
+            responseData.pagination = {
                 page: parseInt(page, 10),
                 per_page: parseInt(perPage, 10),
                 total: total,
@@ -1286,8 +1288,7 @@ const getSetTargetReached = async (req, res) => {
             };
         }
 
-        // Return the response
-        return res.status(200).json(data);
+        return res.status(200).json(responseData);
     } catch (error) {
         return error500(error, res);
     } finally {
@@ -1517,6 +1518,7 @@ const getDashboardDownload = async (req, res) => {
                    COALESCE(cp.current_value, sth.current_value) AS current_value,
                    sth.final_sale_price,
                    sth.available_coins,
+                   sth.total_available_coins,
                    sth.timeframe,
                    COALESCE(cp.fdv_ratio, sth.fdv_ratio) AS fdv_ratio,
                    sth.narrative
@@ -1578,11 +1580,12 @@ const getDashboardDownload = async (req, res) => {
                         current_value : element.current_value,
                         final_sale_price: element.final_sale_price,
                         total_coins: element.available_coins,
+                        available_coins:element.total_available_coins,
                         major_unlock_date : element.timeframe,
                         fdv_ratio : element.fdv_ratio,
                         narrative:element.narrative,
-                        sale_target_coin: footer.sale_target_coin,
                         sale_target: footer.sale_target,
+                        sale_target_coin: footer.sale_target_coin,
                         target_status: footer.target_status,
                         complition_status: footer.complition_status,
                         footer_percent: footer.sale_target_percent,
