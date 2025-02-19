@@ -1841,7 +1841,7 @@ const getDashboardDownload = async (req, res) => {
                 AND stf.untitled_id = ${untitledId}`;
 
       const setFooterResult = await connection.query(setFooterQuery);
-      const footerRows = setFooterResult[0];
+      const footerRows = setFooterResult[0].reverse();
 
       const hasTargetId2 = footerRows.some((footer) => footer.target_id === 2);
 
