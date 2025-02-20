@@ -955,7 +955,7 @@ const getSetTargetDownload = async (req, res) => {
     await connection.beginTransaction();
 
     let getSetTargetQuery = `
-              SELECT sth.sale_target_id, sth.sale_date AS target_date, sth.coin AS coins, sth.exchange, sth.base_price,  
+              SELECT sth.sale_target_id, sth.sale_date AS target_date, sth.coin AS coins, sth.ticker, sth.exchange, sth.base_price,  
                      COALESCE(cp.current_price, sth.currant_price) AS currant_price,
                      COALESCE(cp.market_cap, sth.market_cap) AS market_cap,
                      sth.return_x AS target_return_x,
@@ -1031,11 +1031,13 @@ const getSetTargetDownload = async (req, res) => {
     });
 
     // Restructure data: Keep only one row per coin, add Sale Target columns dynamically
-    let flattenedData = setTarget.map((target) => {
+    let flattenedData = setTarget.map((target, index) => {
       let footers = footerMap[target.sale_target_id] || [];
       let rowData = {
+        "Sr. No.": index + 1, 
         "Target Date": target.target_date,
-        Coin: target.coins,
+        "Coin Name": target.coins,
+        "Coin Ticker":target.ticker,
         Exchange: target.exchange,
         "Base Price": target.base_price,
         "Current Price": target.currant_price,
@@ -1050,17 +1052,18 @@ const getSetTargetDownload = async (req, res) => {
         FDV: target.fdv,
         Narrative: target.narrative,
       };
-
+    
       // Add Sale Target Coin and Sale Target columns dynamically
-      footers.reverse().forEach((footer, index) => {
-        rowData[`Sale Target Coin ${index + 1}`] = footer.sale_target_coin;
-        rowData[`Sale Target ${index + 1}`] = footer.sale_target;
-        rowData[`Target Status ${index + 1}`] = footer.target_status;
-        rowData[`Completion Status ${index + 1}`] = footer.complition_status;
+      footers.reverse().forEach((footer, idx) => {
+        rowData[`Sale Price ${idx + 1}`] = footer.sale_target;
+        // rowData[`Target Status ${idx + 1}`] = footer.target_status;
+        // rowData[`Completion Status ${idx + 1}`] = footer.complition_status;
+        rowData[`Sale Coin ${idx + 1}`] = footer.sale_target_coin;
       });
-
+    
       return rowData;
     });
+    
 
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.json_to_sheet(flattenedData);
@@ -1141,11 +1144,9 @@ const updateSellSold = async (req, res) => {
       ]);
 
       // Calculate available_coins
-      console.log("calculation total-sale coin", total_coins, saleTargetCoin);
-
       const update_total_available_coin =
         total_available_coins - saleTargetCoin;
-      console.log("result coin", available_coins);
+    
 
       // Insert into `sold_coin` table
       const insertSoldCoinQuery = `
@@ -1363,29 +1364,38 @@ const updateSetTarget = async (req, res) => {
 const getSetTarget = async (req, res) => {
   const sale_target_id = parseInt(req.params.id);
   const untitledId = req.companyData.untitled_id;
-  // Attempt to obtain a database connection
   let connection = await getConnection();
+
   try {
-    //Start the transaction
     await connection.beginTransaction();
 
-    let getSetTargetQuery = `SELECT * FROM sale_target_header WHERE sale_target_id = ${sale_target_id} AND untitled_id = ${untitledId} `;
-    let result = await connection.query(getSetTargetQuery);
-    if (result[0].length == 0) {
+    let getSetTargetQuery = `
+      SELECT sth.*, 
+             COALESCE(cp.current_price, sth.currant_price) AS currant_price,
+             COALESCE(cp.current_value, sth.current_value) AS current_value,
+             COALESCE(cp.current_return_x, sth.current_return_x) AS current_return_x,
+             COALESCE(cp.fdv_ratio, sth.fdv_ratio) AS fdv_ratio,
+             COALESCE(cp.market_cap, sth.market_cap) AS market_cap
+      FROM sale_target_header sth
+      LEFT JOIN current_price cp ON sth.sale_target_id = cp.sale_target_id
+      WHERE sth.sale_target_id = ? AND sth.untitled_id = ?`;
+
+    let result = await connection.query(getSetTargetQuery, [sale_target_id, untitledId]);
+
+    if (result[0].length === 0) {
       return error422("Sale target Header Not Found.", res);
     }
+    
     let setTarget = result[0][0];
 
-    //get set_header_footer
+    let setFooterQuery = `
+      SELECT stf.*, ts.target_status, cs.complition_status 
+      FROM set_target_footer stf 
+      LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+      LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+      WHERE stf.sale_target_id = ? AND stf.untitled_id = ?`;
 
-    let setFooterQuery = `SELECT stf.*,ts.target_status, cs.complition_status FROM set_target_footer stf 
-            LEFT JOIN target_status ts
-            ON ts.target_id = stf.target_id
-            LEFT JOIN complition_status cs
-            ON cs.complition_id = stf.complition_id 
-            WHERE stf.sale_target_id = ? AND
-            stf. untitled_id = ${untitledId}`;
-    setFooterResult = await connection.query(setFooterQuery, [sale_target_id]);
+    let setFooterResult = await connection.query(setFooterQuery, [sale_target_id, untitledId]);
     setTarget["footer"] = setFooterResult[0].reverse();
 
     const data = {
@@ -1401,6 +1411,10 @@ const getSetTarget = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
+
+
+
 
 //delete for forntend not database change status
 const deleteSetTargetChangeStatus = async (req, res) => {
@@ -1754,6 +1768,12 @@ WHERE sc.untitled_id = ${untitledId}`;
       return error422("No data found.", res);
     }
 
+    // Add "Sr No" column
+    soldCoin = soldCoin.map((item, index) => ({
+      "Sr No": index + 1, // Add serial number
+      ...item,
+    }));
+
     // Create a new workbook
     const workbook = xlsx.utils.book_new();
 
@@ -1787,6 +1807,7 @@ WHERE sc.untitled_id = ${untitledId}`;
   }
 };
 
+
 const getDashboardDownload = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   const { key } = req.query;
@@ -1796,7 +1817,7 @@ const getDashboardDownload = async (req, res) => {
     await connection.beginTransaction();
 
     let getSetTargetQuery = `
-            SELECT sth.sale_target_id, sth.sale_date, sth.coin, sth.exchange, sth.base_price,  
+            SELECT sth.sale_target_id, sth.sale_date, sth.coin,sth.ticker, sth.exchange, sth.base_price,  
                    COALESCE(cp.current_price, sth.currant_price) AS currant_price,
                    COALESCE(cp.market_cap, sth.market_cap) AS market_cap,
                    sth.return_x,
@@ -1830,7 +1851,8 @@ const getDashboardDownload = async (req, res) => {
     let setTarget = result[0];
 
     let structuredData = [];
-
+    let srNo = 1; 
+    
     for (let element of setTarget) {
       let setFooterQuery = `
                 SELECT stf.*, ts.target_status, cs.complition_status 
@@ -1839,26 +1861,28 @@ const getDashboardDownload = async (req, res) => {
                 LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
                 WHERE stf.sale_target_id = ${element.sale_target_id} 
                 AND stf.untitled_id = ${untitledId}`;
-
+    
       const setFooterResult = await connection.query(setFooterQuery);
       const footerRows = setFooterResult[0].reverse();
-
+    
       const hasTargetId2 = footerRows.some((footer) => footer.target_id === 2);
-
+    
       if (hasTargetId2) {
         let saleTargetCoins = [];
         let saleTargets = [];
-
+    
         for (let i = 0; i < 5; i++) {
           saleTargets.push(footerRows[i] ? footerRows[i].sale_target : "");
           saleTargetCoins.push(
             footerRows[i] ? footerRows[i].sale_target_coin : ""
           );
         }
-
+    
         structuredData.push({
+          "Sr. No": srNo++, // Add serial number
           "Target Date": element.sale_date,
-          Coin: element.coin,
+          "Coin Name": element.coin,
+          "Cion Ticker":element.ticker,
           Exchange: element.exchange,
           "Base Price": element.base_price,
           "Current Price": element.currant_price,
@@ -1872,19 +1896,20 @@ const getDashboardDownload = async (req, res) => {
           "Major Unlock Date": element.timeframe,
           "FDV Ratio": element.fdv_ratio,
           Narrative: element.narrative,
-          "Sale Target 1": saleTargets[0],
-          "Sale Target 2": saleTargets[1],
-          "Sale Target 3": saleTargets[2],
-          "Sale Target 4": saleTargets[3],
-          "Sale Target 5": saleTargets[4],
-          "Sale Target Coin 1": saleTargetCoins[0],
-          "Sale Target Coin 2": saleTargetCoins[1],
-          "Sale Target Coin 3": saleTargetCoins[2],
-          "Sale Target Coin 4": saleTargetCoins[3],
-          "Sale Target Coin 5": saleTargetCoins[4],
+          "Sale Price 1": saleTargets[0],
+          "Sale Price 2": saleTargets[1],
+          "Sale Price 3": saleTargets[2],
+          "Sale Price 4": saleTargets[3],
+          "Sale Price 5": saleTargets[4],
+          "Sale Coin 1": saleTargetCoins[0],
+          "Sale Coin 2": saleTargetCoins[1],
+          "Sale Coin 3": saleTargetCoins[2],
+          "Sale Coin 4": saleTargetCoins[3],
+          "Sale Coin 5": saleTargetCoins[4],
         });
       }
     }
+    
 
     if (structuredData.length === 0) {
       return error422("No data found.", res);
