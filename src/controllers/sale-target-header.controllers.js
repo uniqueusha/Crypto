@@ -1235,73 +1235,52 @@ const getSetTargetCount = async (req, res) => {
 //Update Set Target
 const updateSetTarget = async (req, res) => {
   const sale_target_id = parseInt(req.params.id);
-  const ticker = req.body.ticker ? req.body.ticker : "";
-  const coin = req.body.coin ? req.body.coin : "";
-  const exchange = req.body.exchange ? req.body.exchange : "";
-  const base_price = req.body.base_price ? req.body.base_price : "";
-  const currant_price = req.body.currant_price ? req.body.currant_price : "";
-  const current_value = req.body.current_value ? req.body.current_value : "";
-  const current_return_x = req.body.current_return_x
-    ? req.body.current_return_x
-    : "";
-  const market_cap = req.body.market_cap ? req.body.market_cap : "";
-  const return_x = req.body.return_x ? req.body.return_x : "";
-  const final_sale_price = req.body.final_sale_price
-    ? req.body.final_sale_price
-    : "";
-  const available_coins = req.body.available_coins
-    ? req.body.available_coins
-    : "";
-  const timeframe = req.body.timeframe ? req.body.timeframe : "";
-  const fdv_ratio = req.body.fdv_ratio ? req.body.fdv_ratio : "";
-  const narrative = req.body.narrative ? req.body.narrative : "";
-  const setTargetFooter = req.body.setTargetFooter
-    ? req.body.setTargetFooter
-    : [];
+  const ticker = req.body.ticker || "";
+  const coin = req.body.coin || "";
+  const exchange = req.body.exchange || "";
+  const base_price = req.body.base_price || "";
+  const currant_price = req.body.currant_price || "";
+  const current_value = req.body.current_value || "";
+  const current_return_x = req.body.current_return_x || "";
+  const market_cap = req.body.market_cap || "";
+  const return_x = req.body.return_x || "";
+  const final_sale_price = req.body.final_sale_price || "";
+  const available_coins = req.body.available_coins || "";
+  const timeframe = req.body.timeframe || "";
+  const fdv_ratio = req.body.fdv_ratio || "";
+  const narrative = req.body.narrative || "";
+  const setTargetFooter = req.body.setTargetFooter || [];
   const untitled_id = req.companyData.untitled_id;
-  if (!coin) {
-    return error422("Coin is required.", res);
-  } else if (!return_x) {
-    return error422("Return_x is required.", res);
-  } else if (!available_coins) {
-    return error422("Available Coins is required.", res);
-  }
+
+  if (!coin) return error422("Coin is required.", res);
+  if (!return_x) return error422("Return_x is required.", res);
+  if (!available_coins) return error422("Available Coins is required.", res);
 
   // Check if sale target header exists
-  const saleTargetHeaderQuery =
-    "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
-  const saleTargetHeaderResult = await pool.query(saleTargetHeaderQuery, [
-    sale_target_id,
-  ]);
-  if (saleTargetHeaderResult[0].length === 0) {
+  const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
+  const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [sale_target_id]);
+  if (saleTargetHeaderResult.length === 0) {
     return error422("Sale Target Header Not Found.", res);
   }
 
-  // Attempt to obtain a database connection
   let connection = await getConnection();
 
   try {
-    // Start a transaction
     await connection.beginTransaction();
 
     // Update Sale Target Header
-    const updatesaleTargetHeaderQuery = `UPDATE sale_target_header SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, current_value = ?, current_return_x = ?, market_cap = ?, return_x = ?, final_sale_price = ?, available_coins = ?, timeframe = ?, fdv_ratio = ?, narrative = ? WHERE sale_target_id = ? AND untitled_id = ?`;
+    const updatesaleTargetHeaderQuery = `
+      UPDATE sale_target_header 
+      SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, 
+          current_value = ?, current_return_x = ?, market_cap = ?, 
+          return_x = ?, final_sale_price = ?, available_coins = ?, 
+          timeframe = ?, fdv_ratio = ?, narrative = ? 
+      WHERE sale_target_id = ? AND untitled_id = ?`;
+
     await connection.query(updatesaleTargetHeaderQuery, [
-      ticker,
-      coin,
-      exchange,
-      currant_price,
-      current_value,
-      current_return_x,
-      market_cap,
-      return_x,
-      final_sale_price,
-      available_coins,
-      timeframe,
-      fdv_ratio,
-      narrative,
-      sale_target_id,
-      untitled_id,
+      ticker, coin, exchange, currant_price, current_value, current_return_x,
+      market_cap, return_x, final_sale_price, available_coins,
+      timeframe, fdv_ratio, narrative, sale_target_id, untitled_id
     ]);
 
     // Update set target footer
@@ -1310,46 +1289,74 @@ const updateSetTarget = async (req, res) => {
 
     for (let i = 0; i < setTargetFooterArray.length; i++) {
       const element = setTargetFooterArray[i];
-      if (!element || typeof element !== "object") {
-        continue;
-      }
+      if (!element || typeof element !== "object") continue;
+
       sale_target = sale_target - (sale_target - base_price) / 4;
+      if (i === 0) sale_target = final_sale_price;
 
-      if (i == 0) {
-        sale_target = final_sale_price;
-      }
-
-      const set_footer_id = element.set_footer_id ? element.set_footer_id : "";
-      const sale_target_coin = element.sale_target_coin
-        ? element.sale_target_coin
-        : "";
-      const sale_target_value = element.sale_target_value
-        ? element.sale_target_value
-        : "0";
+      const set_footer_id = element.set_footer_id || "";
+      const sale_target_coin = element.sale_target_coin || "";
+      const sale_target_value = element.sale_target_value || "0";
       const targetValue = (available_coins / 100) * sale_target_value;
 
-      let updateSetTargetFooterQuery = `UPDATE set_target_footer SET sale_target_id = ?, sale_target_coin = ?, sale_target = ?, sale_target_value = ? WHERE sale_target_id = ? AND set_footer_id = ? AND untitled_id = ?`;
-      let updateSetTargetFootervalues = [
-        sale_target_id,
-        targetValue,
-        sale_target,
-        sale_target_value,
-        sale_target_id,
-        set_footer_id,
-        untitled_id,
-      ];
-      await connection.query(
-        updateSetTargetFooterQuery,
-        updateSetTargetFootervalues
-      );
+      const updateSetTargetFooterQuery = `
+        UPDATE set_target_footer 
+        SET sale_target_id = ?, sale_target_coin = ?, sale_target = ?, sale_target_value = ? 
+        WHERE sale_target_id = ? AND set_footer_id = ? AND untitled_id = ?`;
+
+      await connection.query(updateSetTargetFooterQuery, [
+        sale_target_id, targetValue, sale_target, sale_target_value,
+        sale_target_id, set_footer_id, untitled_id
+      ]);
     }
 
-    // Commit the transaction
+    // Get the current total_available_coins
+    const getTotalAvailableCoinsQuery = `
+      SELECT total_available_coins FROM sale_target_header 
+      WHERE sale_target_id = ? AND untitled_id = ?`;
+
+    const [totalAvailableCoinsResult] = await connection.query(getTotalAvailableCoinsQuery, [
+      sale_target_id, untitled_id
+    ]);
+
+    let total_available_coins = totalAvailableCoinsResult.length > 0 ? 
+      totalAvailableCoinsResult[0].total_available_coins : 0;
+
+    // Pehle total_available_coins ko available_coins se update karo
+    total_available_coins = available_coins;
+
+    // Ab complition_id = 4 wale set_footer_id ke sale_target_coin ka total nikal lo
+    const getSaleTargetCoinQuery = `
+      SELECT SUM(sale_target_coin) AS total_sale_target_coin
+      FROM set_target_footer 
+      WHERE sale_target_id = ? AND untitled_id = ? AND complition_id = 4`;  // ✅ Fixed column name
+
+    const [saleTargetCoinResult] = await connection.query(getSaleTargetCoinQuery, [
+      sale_target_id, untitled_id
+    ]);
+
+    const total_sale_target_coin = saleTargetCoinResult.length > 0 ? 
+      (saleTargetCoinResult[0].total_sale_target_coin || 0) : 0;
+
+    // Ab total_available_coins se complition_id = 4 ka sale_target_coin subtract karo
+    total_available_coins -= total_sale_target_coin;
+
+    // Update sale_target_header with the correct total_available_coins
+    const updateTotalAvailableCoinsQuery = `
+      UPDATE sale_target_header 
+      SET total_available_coins = ? 
+      WHERE sale_target_id = ? AND untitled_id = ?`;
+
+    await connection.query(updateTotalAvailableCoinsQuery, [
+      total_available_coins, sale_target_id, untitled_id
+    ]);
+
     await connection.commit();
     return res.status(200).json({
       status: 200,
       message: "Set Target updated successfully.",
     });
+
   } catch (error) {
     await connection.rollback();
     return error500(error, res);
@@ -1359,6 +1366,9 @@ const updateSetTarget = async (req, res) => {
     }
   }
 };
+
+
+
 
 //set target by id
 const getSetTarget = async (req, res) => {
