@@ -1064,10 +1064,11 @@ const getSetTargetDownload = async (req, res) => {
         rowData[`Sale Price ${idx + 1}`] = footer.sale_target;
         // rowData[`Target Status ${idx + 1}`] = footer.target_status;
         // rowData[`Completion Status ${idx + 1}`] = footer.complition_status;
-        rowData[`Sale Coin ${idx + 1}`] =
-          parseFloat(footer.sale_target_coin) % 1 === 0
-            ? parseInt(footer.sale_target_coin)
-            : footer.sale_target_coin;
+        rowData[`Sale Coin ${idx + 1}`] = 
+        parseFloat(footer.sale_target_coin) % 1 === 0 
+          ? parseInt(footer.sale_target_coin) 
+          : parseFloat(footer.sale_target_coin).toFixed(4);
+      
       });
 
       return rowData;
