@@ -1030,7 +1030,6 @@ const getSetTargetDownload = async (req, res) => {
       });
     });
 
-
     // Restructure data: Keep only one row per coin, add Sale Target columns dynamically
     let flattenedData = setTarget.map((target, index) => {
       let footers = footerMap[target.sale_target_id] || [];
@@ -1047,8 +1046,14 @@ const getSetTargetDownload = async (req, res) => {
         "Current Return X": target.current_return_x,
         "Current Value": target.current_value,
         "Final Sale Price": target.final_sale_price,
-        "Total Coins": parseFloat(target.total_coins) % 1 === 0 ? parseInt(target.total_coins) : target.total_coins,
-        "Available Coins": parseFloat(target.total_available_coins) % 1 === 0 ? parseInt(target.total_available_coins) : target.total_available_coins,
+        "Total Coins":
+          parseFloat(target.total_coins) % 1 === 0
+            ? parseInt(target.total_coins)
+            : target.total_coins,
+        "Available Coins":
+          parseFloat(target.total_available_coins) % 1 === 0
+            ? parseInt(target.total_available_coins)
+            : target.total_available_coins,
         "Major Unlock Date": target.major_unlock_date,
         FDV: target.fdv,
         Narrative: target.narrative,
@@ -1059,7 +1064,10 @@ const getSetTargetDownload = async (req, res) => {
         rowData[`Sale Price ${idx + 1}`] = footer.sale_target;
         // rowData[`Target Status ${idx + 1}`] = footer.target_status;
         // rowData[`Completion Status ${idx + 1}`] = footer.complition_status;
-        rowData[`Sale Coin ${idx + 1}`] = footer.sale_target_coin;
+        rowData[`Sale Coin ${idx + 1}`] =
+          parseFloat(footer.sale_target_coin) % 1 === 0
+            ? parseInt(footer.sale_target_coin)
+            : footer.sale_target_coin;
       });
 
       return rowData;
@@ -1775,7 +1783,7 @@ const getSoldCoinDownload = async (req, res) => {
 TRIM(TRAILING '.0000' FROM FORMAT(sth.available_coins, 4)) AS "Total Coins",  
     sc.base_price AS "Base Price",
     sc.sold_current_price AS "Sold Price", 
-    sf.sale_target_coin AS "Sold Coins", 
+ TRIM(TRAILING '.0000' FROM FORMAT(sf.sale_target_coin, 4)) AS "Sold Coins",
     (sc.sold_current_price * sf.sale_target_coin) AS "Total",
     TRIM(TRAILING '.0000' FROM FORMAT(sth.available_coins - SUM(sf.sale_target_coin) OVER (PARTITION BY sf.sale_target_id ORDER BY sc.created_at), 4)) AS "Available Coins"
 FROM sold_coin sc
@@ -1851,7 +1859,7 @@ const getDashboardDownload = async (req, res) => {
     await connection.beginTransaction();
 
     let getSetTargetQuery = `
-            SELECT sth.sale_target_id, sth.sale_date, sth.coin,sth.ticker, sth.exchange, sth.base_price,  
+            SELECT sth.sale_target_id, sth.sale_date, sth.coin, sth.ticker, sth.exchange, sth.base_price,  
                    COALESCE(cp.current_price, sth.currant_price) AS currant_price,
                    COALESCE(cp.market_cap, sth.market_cap) AS market_cap,
                    sth.return_x,
@@ -1911,6 +1919,10 @@ const getDashboardDownload = async (req, res) => {
           );
         }
 
+        // Function to format numbers (convert to integer if decimal part is zero)
+        const formatNumber = (value) =>
+          parseFloat(value) % 1 === 0 ? parseInt(value) : value;
+
         structuredData.push({
           "Sr. No": srNo++, // Add serial number
           "Target Date": element.sale_date,
@@ -1924,14 +1936,8 @@ const getDashboardDownload = async (req, res) => {
           "Current Return X": element.current_return_x,
           "Current Value": element.current_value,
           "Final Sale Price": element.final_sale_price,
-          "Total Coins":
-            parseFloat(element.available_coins) % 1 === 0
-              ? parseInt(element.available_coins)
-              : element.available_coins,
-          "Available Coins":
-            parseFloat(element.total_available_coins) % 1 === 0
-              ? parseInt(element.total_available_coins)
-              : element.total_available_coins,
+          "Total Coins": formatNumber(element.available_coins),
+          "Available Coins": formatNumber(element.total_available_coins),
           "Major Unlock Date": element.timeframe,
           "FDV Ratio": element.fdv_ratio,
           Narrative: element.narrative,
@@ -1940,11 +1946,35 @@ const getDashboardDownload = async (req, res) => {
           "Sale Price 3": saleTargets[2],
           "Sale Price 4": saleTargets[3],
           "Sale Price 5": saleTargets[4],
-          "Sale Coin 1": saleTargetCoins[0],
-          "Sale Coin 2": saleTargetCoins[1],
-          "Sale Coin 3": saleTargetCoins[2],
-          "Sale Coin 4": saleTargetCoins[3],
-          "Sale Coin 5": saleTargetCoins[4],
+          "Sale Coin 1": saleTargetCoins[0]
+            ? parseFloat(saleTargetCoins[0]) % 1 === 0
+              ? parseInt(saleTargetCoins[0])
+              : parseFloat(saleTargetCoins[0]).toFixed(4)
+            : "",
+
+          "Sale Coin 2": saleTargetCoins[1]
+            ? parseFloat(saleTargetCoins[1]) % 1 === 0
+              ? parseInt(saleTargetCoins[1])
+              : parseFloat(saleTargetCoins[1]).toFixed(4)
+            : "",
+
+          "Sale Coin 3": saleTargetCoins[2]
+            ? parseFloat(saleTargetCoins[2]) % 1 === 0
+              ? parseInt(saleTargetCoins[2])
+              : parseFloat(saleTargetCoins[2]).toFixed(4)
+            : "",
+
+          "Sale Coin 4": saleTargetCoins[3]
+            ? parseFloat(saleTargetCoins[3]) % 1 === 0
+              ? parseInt(saleTargetCoins[3])
+              : parseFloat(saleTargetCoins[3]).toFixed(4)
+            : "",
+
+          "Sale Coin 5": saleTargetCoins[4]
+            ? parseFloat(saleTargetCoins[4]) % 1 === 0
+              ? parseInt(saleTargetCoins[4])
+              : parseFloat(saleTargetCoins[4]).toFixed(4)
+            : "",
         });
       }
     }
