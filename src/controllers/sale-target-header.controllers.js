@@ -969,7 +969,7 @@ const getSetTargetDownload = async (req, res) => {
                      sth.narrative
               FROM sale_target_header sth
               LEFT JOIN current_price cp ON sth.sale_target_id = cp.sale_target_id
-              WHERE sth.untitled_id = ${untitledId} AND sth.status = 1
+              WHERE sth.untitled_id = ${untitledId} AND sth.status = 1 
           `;
 
     if (key) {
@@ -983,8 +983,7 @@ const getSetTargetDownload = async (req, res) => {
       }
     }
 
-    getSetTargetQuery +=
-      " ORDER BY COALESCE(cp.market_cap, sth.market_cap) DESC";
+    getSetTargetQuery += " ORDER BY sth.market_cap DESC";
 
     let [setTarget] = await connection.query(getSetTargetQuery);
 
@@ -1007,10 +1006,8 @@ const getSetTargetDownload = async (req, res) => {
                   FROM set_target_footer stf
                   LEFT JOIN target_status ts ON ts.target_id = stf.target_id
                   LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
-                  WHERE stf.untitled_id = ? AND stf.sale_target_id IN (${saleTargetIds.join(
-                    ","
-                  )})
-                  ORDER BY stf.sale_target_id ASC
+                  WHERE stf.untitled_id = ? AND stf.sale_target_id IN (${saleTargetIds.join(",")})
+                  ORDER BY COALESCE(stf.sale_target_percent, 0) DESC, stf.sale_target_id ASC
               `;
 
       [setFooterResult] = await connection.query(setFooterQuery, [untitledId]);
@@ -1026,11 +1023,9 @@ const getSetTargetDownload = async (req, res) => {
         sale_target: footer.sale_target,
         target_status: footer.target_status,
         complition_status: footer.complition_status,
-        //   footer_percent: footer.sale_target_percent,
       });
     });
 
-    // Restructure data: Keep only one row per coin, add Sale Target columns dynamically
     let flattenedData = setTarget.map((target, index) => {
       let footers = footerMap[target.sale_target_id] || [];
       let rowData = {
@@ -1046,34 +1041,23 @@ const getSetTargetDownload = async (req, res) => {
         "Current Return X": target.current_return_x,
         "Current Value": target.current_value,
         "Final Sale Price": target.final_sale_price,
-        "Total Coins":
-          parseFloat(target.total_coins) % 1 === 0
-            ? parseInt(target.total_coins)
-            : target.total_coins,
-        "Available Coins":
-          parseFloat(target.total_available_coins) % 1 === 0
-            ? parseInt(target.total_available_coins)
-            : target.total_available_coins,
+        "Total Coins": parseFloat(target.total_coins) % 1 === 0 ? parseInt(target.total_coins) : target.total_coins,
+        "Available Coins": parseFloat(target.total_available_coins) % 1 === 0 ? parseInt(target.total_available_coins) : target.total_available_coins,
         "Major Unlock Date": target.major_unlock_date,
         FDV: target.fdv,
         Narrative: target.narrative,
       };
 
-      // Add Sale Target Coin and Sale Target columns dynamically
       footers.reverse().forEach((footer, idx) => {
         rowData[`Sale Price ${idx + 1}`] = footer.sale_target;
-        // rowData[`Target Status ${idx + 1}`] = footer.target_status;
-        // rowData[`Completion Status ${idx + 1}`] = footer.complition_status;
-        rowData[`Sale Coin ${idx + 1}`] = 
-        parseFloat(footer.sale_target_coin) % 1 === 0 
+        rowData[`Sale Coin ${idx + 1}`] = parseFloat(footer.sale_target_coin) % 1 === 0 
           ? parseInt(footer.sale_target_coin) 
           : parseFloat(footer.sale_target_coin).toFixed(4);
-      
       });
 
       return rowData;
     });
-
+    flattenedData.sort((a, b) => b["Market Cap"] - a["Market Cap"]);
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.json_to_sheet(flattenedData);
     xlsx.utils.book_append_sheet(workbook, worksheet, "SetTargetInfo");
@@ -1888,7 +1872,7 @@ const getDashboardDownload = async (req, res) => {
       }
     }
 
-    getSetTargetQuery += " ORDER BY sth.sale_date DESC";
+    getSetTargetQuery += " ORDER BY market_cap DESC";
 
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
@@ -1983,7 +1967,7 @@ const getDashboardDownload = async (req, res) => {
     if (structuredData.length === 0) {
       return error422("No data found.", res);
     }
-
+    structuredData.sort((a, b) => b["Market Cap"] - a["Market Cap"]);
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.json_to_sheet(structuredData);
     xlsx.utils.book_append_sheet(workbook, worksheet, "filteredDataInfo");
