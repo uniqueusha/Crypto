@@ -158,21 +158,19 @@ const addSaleTargetHeader = async (req, res) => {
   const ticker = req.body.ticker || "";
   const coin = req.body.coin || "";
   const exchange = req.body.exchange || "";
-  const base_price = parseFloat(req.body.base_price) || 0;
-  const currant_price = parseFloat(req.body.currant_price) || 0;
-  const current_value = parseFloat(req.body.current_value) || 0;
-  const current_return_x = parseFloat(req.body.current_return_x) || 0;
+  const base_price = req.body.base_price || 0;
+  const currant_price = req.body.currant_price || 0;
+  const current_value = req.body.current_value || 0;
+  const current_return_x = req.body.current_return_x || 0;
   const market_cap = req.body.market_cap || "";
-  const return_x = parseFloat(req.body.return_x) || 0;
-  const final_sale_price = parseFloat(req.body.final_sale_price) || 0;
-  const available_coins = parseFloat(req.body.available_coins) || 0;
-  const total_available_coins = req.body.available_coins || "";
+  const return_x = req.body.return_x || 0;
+  const final_sale_price = req.body.final_sale_price || 0;
+  const available_coins = req.body.available_coins?.toString() || "0"; // Preserve as string
+  const total_available_coins = req.body.total_available_coins?.toString() || "0";
   const timeframe = req.body.timeframe || "";
   const fdv_ratio = req.body.fdv_ratio || "";
   const narrative = req.body.narrative || "";
-  const setTargetFooter = Array.isArray(req.body.setTargetFooter)
-    ? req.body.setTargetFooter
-    : [];
+  const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
   const untitled_id = req.companyData.untitled_id;
 
   if (!coin) {
@@ -188,26 +186,13 @@ const addSaleTargetHeader = async (req, res) => {
   let connection = await getConnection();
 
   try {
-    // Check if the coin already exists
-    // const isExistCoinQuery = `SELECT * FROM sale_target_header WHERE LOWER(TRIM(coin)) = ? AND untitled_id = ? AND status = 1`;
-    // const isExistCoinResult = await pool.query(isExistCoinQuery, [coin.toLowerCase(), untitled_id]);
-
-    // Check if the coin already exists
-    //  const isExistExchangeQuery = `SELECT * FROM sale_target_header WHERE  untitled_id = ? AND status = 1 AND exchange = ?`;
-    //  const isExistExchangeResult = await pool.query(isExistExchangeQuery, [untitled_id, exchange]);
-
-    // if (isExistCoinResult[0].length > 0 && isExistExchangeResult[0].length > 0) {
-    //     return error422("Coin And Exchange already exists.", res);
-    // }
-
-    // Start the transaction
     await connection.beginTransaction();
 
     const insertSaleTargetHeaderQuery = `
-            INSERT INTO sale_target_header (
-                ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
-                market_cap, return_x, final_sale_price, available_coins, total_available_coins, timeframe, fdv_ratio, narrative, untitled_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      INSERT INTO sale_target_header (
+          ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
+          market_cap, return_x, final_sale_price, available_coins, total_available_coins, timeframe, fdv_ratio, narrative, untitled_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS CHAR), CAST(? AS CHAR), ?, ?, ?, ?)`;
 
     const insertSaleTargetHeaderValues = [
       ticker,
@@ -220,8 +205,8 @@ const addSaleTargetHeader = async (req, res) => {
       market_cap,
       return_x,
       final_sale_price,
-      available_coins,
-      total_available_coins,
+      available_coins, // Stored as string to preserve format
+      total_available_coins, // Stored as string
       timeframe,
       fdv_ratio,
       narrative,
@@ -248,14 +233,14 @@ const addSaleTargetHeader = async (req, res) => {
         sale_target = final_sale_price;
       }
 
-      const sale_target_value = parseFloat(element.sale_target_value) || 0;
-      const sale_target_percent = element.sale_target_percent || "";
-      const targetValue = (available_coins / 100) * sale_target_value;
+      const sale_target_value = element.sale_target_value?.toString() || "0"; // Ensure string format
+      const sale_target_percent = element.sale_target_percent?.toString() || "0"; // Ensure string format
+      const targetValue = ((parseFloat(available_coins) / 100) * parseFloat(sale_target_value)).toString();
 
       const insertSetTargetFooterQuery = `
-                INSERT INTO set_target_footer (
-                    sale_target_id, sale_target_coin, sale_target, sale_target_value, sale_target_percent, untitled_id
-                ) VALUES (?, ?, ?, ?, ?, ?)`;
+        INSERT INTO set_target_footer (
+            sale_target_id, sale_target_coin, sale_target, sale_target_value, sale_target_percent, untitled_id
+        ) VALUES (?, ?, ?, CAST(? AS CHAR), CAST(? AS CHAR), ?)`;
 
       const insertSetTargetFooterValues = [
         sale_target_id,
@@ -265,13 +250,9 @@ const addSaleTargetHeader = async (req, res) => {
         sale_target_percent,
         untitled_id,
       ];
-      await connection.query(
-        insertSetTargetFooterQuery,
-        insertSetTargetFooterValues
-      );
+      await connection.query(insertSetTargetFooterQuery, insertSetTargetFooterValues);
     }
 
-    // Commit the transaction
     await connection.commit();
 
     res.status(200).json({
@@ -285,6 +266,7 @@ const addSaleTargetHeader = async (req, res) => {
     await connection.release();
   }
 };
+
 
 //coin and exchange already exist
 // const addCoinExchange = async (req, res) => {
@@ -1230,16 +1212,16 @@ const updateSetTarget = async (req, res) => {
   const ticker = req.body.ticker || "";
   const coin = req.body.coin || "";
   const exchange = req.body.exchange || "";
-  const base_price = req.body.base_price || "";
-  const currant_price = req.body.currant_price || "";
-  const current_value = req.body.current_value || "";
-  const current_return_x = req.body.current_return_x || "";
-  const market_cap = req.body.market_cap || "";
-  const return_x = req.body.return_x || "";
-  const final_sale_price = req.body.final_sale_price || "";
-  const available_coins = req.body.available_coins || "";
+  const base_price = parseFloat(req.body.base_price) || 0;
+  const currant_price = parseFloat(req.body.currant_price) || 0;
+  const current_value = parseFloat(req.body.current_value) || 0;
+  const current_return_x = parseFloat(req.body.current_return_x) || 0;
+  const market_cap = parseFloat(req.body.market_cap) || 0;
+  const return_x = parseFloat(req.body.return_x) || 0;
+  const final_sale_price = parseFloat(req.body.final_sale_price) || 0;
+  let available_coins = parseFloat(req.body.available_coins) || 0;
   const timeframe = req.body.timeframe || "";
-  const fdv_ratio = req.body.fdv_ratio || "";
+  const fdv_ratio = parseFloat(req.body.fdv_ratio) || 0;
   const narrative = req.body.narrative || "";
   const setTargetFooter = req.body.setTargetFooter || [];
   const untitled_id = req.companyData.untitled_id;
@@ -1248,27 +1230,21 @@ const updateSetTarget = async (req, res) => {
   if (!return_x) return error422("Return_x is required.", res);
   if (!available_coins) return error422("Available Coins is required.", res);
 
-  // Check if sale target header exists
-  const saleTargetHeaderQuery =
-    "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
-  const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [
-    sale_target_id,
-  ]);
+  const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
+  const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [sale_target_id]);
   if (saleTargetHeaderResult.length === 0) {
     return error422("Sale Target Header Not Found.", res);
   }
 
   let connection = await getConnection();
-
   try {
     await connection.beginTransaction();
 
-    // Update Sale Target Header
     const updatesaleTargetHeaderQuery = `
       UPDATE sale_target_header 
       SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, 
           current_value = ?, current_return_x = ?, market_cap = ?, 
-          return_x = ?, final_sale_price = ?, available_coins = ?, 
+          return_x = ?, final_sale_price = ?, available_coins = CAST(? AS DECIMAL(10,4)), 
           timeframe = ?, fdv_ratio = ?, narrative = ? 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
@@ -1290,7 +1266,18 @@ const updateSetTarget = async (req, res) => {
       untitled_id,
     ]);
 
-    // Update set target footer
+    // Update current_value in current_price table
+    const updateCurrentPriceQuery = `
+      UPDATE current_price 
+      SET current_value = ? 
+      WHERE sale_target_id = ? AND untitled_id = ?`;
+
+    await connection.query(updateCurrentPriceQuery, [
+      current_value,
+      sale_target_id,
+      untitled_id,
+    ]);
+
     let setTargetFooterArray = setTargetFooter.reverse();
     let sale_target = final_sale_price;
 
@@ -1302,8 +1289,8 @@ const updateSetTarget = async (req, res) => {
       if (i === 0) sale_target = final_sale_price;
 
       const set_footer_id = element.set_footer_id || "";
-      const sale_target_coin = element.sale_target_coin || "";
-      const sale_target_value = element.sale_target_value || "0";
+      const sale_target_coin = parseFloat(element.sale_target_coin) || 0;
+      const sale_target_value = parseFloat(element.sale_target_value) || 0;
       const targetValue = (available_coins / 100) * sale_target_value;
 
       const updateSetTargetFooterQuery = `
@@ -1322,47 +1309,37 @@ const updateSetTarget = async (req, res) => {
       ]);
     }
 
-    // Get the current total_available_coins
     const getTotalAvailableCoinsQuery = `
-      SELECT total_available_coins FROM sale_target_header 
+      SELECT CAST(total_available_coins AS DECIMAL(10,4)) AS total_available_coins 
+      FROM sale_target_header 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
-    const [totalAvailableCoinsResult] = await connection.query(
-      getTotalAvailableCoinsQuery,
-      [sale_target_id, untitled_id]
-    );
+    const [totalAvailableCoinsResult] = await connection.query(getTotalAvailableCoinsQuery, [sale_target_id, untitled_id]);
 
     let total_available_coins =
       totalAvailableCoinsResult.length > 0
-        ? totalAvailableCoinsResult[0].total_available_coins
+        ? parseFloat(totalAvailableCoinsResult[0].total_available_coins) || 0
         : 0;
 
-    // Pehle total_available_coins ko available_coins se update karo
     total_available_coins = available_coins;
 
-    // Ab complition_id = 4 wale set_footer_id ke sale_target_coin ka total nikal lo
     const getSaleTargetCoinQuery = `
       SELECT SUM(sale_target_coin) AS total_sale_target_coin
       FROM set_target_footer 
-      WHERE sale_target_id = ? AND untitled_id = ? AND complition_id = 4`; // ✅ Fixed column name
+      WHERE sale_target_id = ? AND untitled_id = ? AND complition_id = 4`;
 
-    const [saleTargetCoinResult] = await connection.query(
-      getSaleTargetCoinQuery,
-      [sale_target_id, untitled_id]
-    );
+    const [saleTargetCoinResult] = await connection.query(getSaleTargetCoinQuery, [sale_target_id, untitled_id]);
 
     const total_sale_target_coin =
       saleTargetCoinResult.length > 0
-        ? saleTargetCoinResult[0].total_sale_target_coin || 0
+        ? parseFloat(saleTargetCoinResult[0].total_sale_target_coin) || 0
         : 0;
 
-    // Ab total_available_coins se complition_id = 4 ka sale_target_coin subtract karo
     total_available_coins -= total_sale_target_coin;
 
-    // Update sale_target_header with the correct total_available_coins
     const updateTotalAvailableCoinsQuery = `
       UPDATE sale_target_header 
-      SET total_available_coins = ? 
+      SET total_available_coins = CAST(? AS DECIMAL(10,4)) 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
     await connection.query(updateTotalAvailableCoinsQuery, [
@@ -1385,6 +1362,7 @@ const updateSetTarget = async (req, res) => {
     }
   }
 };
+
 
 //set target by id
 const getSetTarget = async (req, res) => {
