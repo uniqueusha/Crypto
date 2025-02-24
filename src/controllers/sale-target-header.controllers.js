@@ -1030,7 +1030,7 @@ const getSetTargetDownload = async (req, res) => {
       let footers = footerMap[target.sale_target_id] || [];
       let rowData = {
         "Sr. No.": index + 1,
-        "Target Date": target.target_date,
+        "Date": target.target_date,
         "Coin Name": target.coins,
         "Coin Ticker": target.ticker,
         Exchange: target.exchange,
@@ -1910,7 +1910,7 @@ const getDashboardDownload = async (req, res) => {
 
         structuredData.push({
           "Sr. No": srNo++, // Add serial number
-          "Target Date": element.sale_date,
+          "Date": element.sale_date,
           "Coin Name": element.coin,
           "Cion Ticker": element.ticker,
           Exchange: element.exchange,
