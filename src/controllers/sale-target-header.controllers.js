@@ -165,7 +165,7 @@ const addSaleTargetHeader = async (req, res) => {
   const market_cap = req.body.market_cap || "";
   const return_x = req.body.return_x || 0;
   const final_sale_price = req.body.final_sale_price || 0;
-  const available_coins = parseFloat(req.body.available_coins)|| "0";
+  const available_coins = req.body.available_coins?.toString() || "0";
   const timeframe = req.body.timeframe || "";
   const fdv_ratio = req.body.fdv_ratio || "";
   const narrative = req.body.narrative || "";
@@ -191,7 +191,7 @@ const addSaleTargetHeader = async (req, res) => {
       INSERT INTO sale_target_header (
           ticker, coin, exchange, base_price, currant_price, current_value, current_return_x,
           market_cap, return_x, final_sale_price, available_coins, total_available_coins, timeframe, fdv_ratio, narrative, untitled_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS CHAR), CAST(? AS CHAR), ?, ?, ?, ?)`;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const insertSaleTargetHeaderValues = [
       ticker,
@@ -227,19 +227,18 @@ const addSaleTargetHeader = async (req, res) => {
       if (!element || typeof element !== "object") continue;
 
       sale_target = sale_target - (sale_target - base_price) / 4;
-
       if (i === 0) {
         sale_target = final_sale_price;
       }
 
-      const sale_target_value = element.sale_target_value?.toString() || "0"; // Ensure string format
-      const sale_target_percent = element.sale_target_percent?.toString() || "0"; // Ensure string format
+      const sale_target_value = element.sale_target_value?.toString() || "0";
+      const sale_target_percent = element.sale_target_percent?.toString() || "0";
       const targetValue = ((parseFloat(available_coins) / 100) * parseFloat(sale_target_value)).toString();
 
       const insertSetTargetFooterQuery = `
         INSERT INTO set_target_footer (
             sale_target_id, sale_target_coin, sale_target, sale_target_value, sale_target_percent, untitled_id
-        ) VALUES (?, ?, ?, CAST(? AS CHAR), CAST(? AS CHAR), ?)`;
+        ) VALUES (?, ?, ?, ?, ?, ?)`;
 
       const insertSetTargetFooterValues = [
         sale_target_id,
@@ -265,6 +264,7 @@ const addSaleTargetHeader = async (req, res) => {
     await connection.release();
   }
 };
+
 
 
 //coin and exchange already exist
