@@ -1006,7 +1006,18 @@ const getSetTargetDownload = async (req, res) => {
         complition_status: footer.complition_status,
       });
     });
-
+    const formatCoinValue = (value) => {
+      if (value == null || isNaN(Number(value))) return "0";
+    
+      let formattedValue = (Math.floor(Number(value) * 10000) / 10000).toFixed(4);
+    
+      // Remove unnecessary trailing zeros, keeping up to 4 decimals where needed
+      if (formattedValue.endsWith(".0000")) {
+        return formattedValue.slice(0, -5);
+      }
+    
+      return formattedValue.replace(/(\.\d*?[1-9])0+$/, "$1");
+    };
     let flattenedData = setTarget.map((target, index) => {
       let footers = footerMap[target.sale_target_id] || [];
       let rowData = {
@@ -1022,8 +1033,8 @@ const getSetTargetDownload = async (req, res) => {
         "Current Return X": target.current_return_x,
         "Current Value": target.current_value,
         "Final Sale Price": target.final_sale_price,
-        "Total Coins": parseFloat(target.total_coins) % 1 === 0 ? parseInt(target.total_coins) : target.total_coins,
-        "Available Coins": parseFloat(target.total_available_coins) % 1 === 0 ? parseInt(target.total_available_coins) : target.total_available_coins,
+        "Total Coins": formatCoinValue(target.total_coins),
+        "Available Coins": formatCoinValue(target.total_available_coins),
         "Major Unlock Date": target.major_unlock_date,
         FDV: target.fdv,
         Narrative: target.narrative,
@@ -1243,7 +1254,7 @@ const updateSetTarget = async (req, res) => {
       UPDATE sale_target_header 
       SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, 
           current_value = ?, current_return_x = ?, market_cap = ?, 
-          return_x = ?, final_sale_price = ?, available_coins = CAST(? AS DECIMAL(10,4)), 
+          return_x = ?, final_sale_price = ?, available_coins = ?, 
           timeframe = ?, fdv_ratio = ?, narrative = ? 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
@@ -1309,7 +1320,7 @@ const updateSetTarget = async (req, res) => {
     }
 
     const getTotalAvailableCoinsQuery = `
-      SELECT CAST(total_available_coins AS DECIMAL(10,4)) AS total_available_coins 
+      SELECT  total_available_coins 
       FROM sale_target_header 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
@@ -1338,7 +1349,7 @@ const updateSetTarget = async (req, res) => {
 
     const updateTotalAvailableCoinsQuery = `
       UPDATE sale_target_header 
-      SET total_available_coins = CAST(? AS DECIMAL(10,4)) 
+      SET total_available_coins = ?
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
     await connection.query(updateTotalAvailableCoinsQuery, [
@@ -1882,8 +1893,18 @@ const getDashboardDownload = async (req, res) => {
         }
 
         // Function to format numbers (convert to integer if decimal part is zero)
-        const formatNumber = (value) =>
-          parseFloat(value) % 1 === 0 ? parseInt(value) : value;
+        const formatCoinValue = (value) => {
+          if (value == null || isNaN(Number(value))) return "0";
+        
+          let formattedValue = (Math.floor(Number(value) * 10000) / 10000).toFixed(4);
+        
+          // Remove unnecessary trailing zeros, keeping up to 4 decimals where needed
+          if (formattedValue.endsWith(".0000")) {
+            return formattedValue.slice(0, -5);
+          }
+        
+          return formattedValue.replace(/(\.\d*?[1-9])0+$/, "$1");
+        };
 
         structuredData.push({
           "Sr. No": srNo++, // Add serial number
@@ -1898,8 +1919,8 @@ const getDashboardDownload = async (req, res) => {
           "Current Return X": element.current_return_x,
           "Current Value": element.current_value,
           "Final Sale Price": element.final_sale_price,
-          "Total Coins": formatNumber(element.available_coins),
-          "Available Coins": formatNumber(element.total_available_coins),
+          "Total Coins": formatCoinValue(element.available_coins),
+          "Available Coins": formatCoinValue(element.total_available_coins),
           "Major Unlock Date": element.timeframe,
           "FDV Ratio": element.fdv_ratio,
           Narrative: element.narrative,
