@@ -165,8 +165,7 @@ const addSaleTargetHeader = async (req, res) => {
   const market_cap = req.body.market_cap || "";
   const return_x = req.body.return_x || 0;
   const final_sale_price = req.body.final_sale_price || 0;
-  const available_coins = req.body.available_coins?.toString() || "0"; // Preserve as string
-  const total_available_coins = req.body.total_available_coins?.toString() || "0";
+  const available_coins = parseFloat(req.body.available_coins)|| "0";
   const timeframe = req.body.timeframe || "";
   const fdv_ratio = req.body.fdv_ratio || "";
   const narrative = req.body.narrative || "";
@@ -205,8 +204,8 @@ const addSaleTargetHeader = async (req, res) => {
       market_cap,
       return_x,
       final_sale_price,
-      available_coins, // Stored as string to preserve format
-      total_available_coins, // Stored as string
+      available_coins, 
+      available_coins, 
       timeframe,
       fdv_ratio,
       narrative,
