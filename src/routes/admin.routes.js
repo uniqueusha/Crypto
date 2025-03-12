@@ -9,6 +9,7 @@ router.post('/', userController.addUser);
 router.get('/', userController.getUsers);
 //login
 router.post('/login',userController.userLogin);
+// router.post('/password', userController.getPassword);
 //Active list
 router.get('/wma',userController.getUserWma);
 //user count
