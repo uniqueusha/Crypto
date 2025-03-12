@@ -139,14 +139,14 @@ const addUser = async (req, res) => {
         return error422("Email Id is already exists.", res);
     }
 
-    // Check if user type exists
-    const userTypeQuery ="SELECT * FROM user_type WHERE user_type_id = ?";
-    const userTypeResult = await pool.query(userTypeQuery, [
-        user_type_id,
-    ]);
-    if (userTypeResult[0].length == 0) {
-        return error422("User Type Not Found.", res);
-    }
+    // // Check if user type exists
+    // const userTypeQuery ="SELECT * FROM user_type WHERE user_type_id = ?";
+    // const userTypeResult = await pool.query(userTypeQuery, [
+    //     user_type_id,
+    // ]);
+    // if (userTypeResult[0].length == 0) {
+    //     return error422("User Type Not Found.", res);
+    // }
 
     // Attempt to obtain a database connection
     let connection = await getConnection();
@@ -698,6 +698,91 @@ const onChangePassword = async (req, res) => {
 };
 
 
+//hash password to normal
+// const getPassword = async (req, res) => {
+//     const { untitled_id } = req.query;
+    
+//     const extenstions = req.body.extenstions ? req.body.extenstions.trim() : "";
+//     // Attempt to obtain a database connection
+//     let connection = await getConnection();
+
+//     try {
+//         // Start a transaction
+//         await connection.beginTransaction();
+
+//         let getPasswordQuery = `SELECT u.untitled_id,c.extenstions FROM untitled u
+//             LEFT JOIN contrasena C
+//             ON u.untitled_id = c.untitled_id
+//             WHERE u.untitled_id = ${untitled_id} AND c.extenstions = ${extenstions}`;
+//         let getPasswordResult = await connection.query(getPasswordQuery);
+        
+//         const data = {
+//             status: 200,
+//             message: "Password Normal successfully",
+            
+//         };
+
+//         return res.status(200).json(data);
+//     } catch (error) {
+//         return error500(error, res);
+//     } finally {
+//         await connection.release();
+//     }
+// };
+
+
+
+// const getPassword = async (req, res) => {
+//     const { untitled_id } = req.query;
+//     const extenstions = req.body.extenstions ? req.body.extenstions.trim() : "";
+
+//     // Define or import passwordMap
+//     const passwordMap = {
+//         "pdf": "secure123",
+//         "doc": "wordpass",
+//         "jpg": "imagekey"
+//     };
+
+//     let connection = await getConnection();
+
+//     try {
+//         await connection.beginTransaction();
+
+//         let getPasswordQuery = `
+//             SELECT u.untitled_id, c.extenstions  
+//             FROM untitled u
+//             LEFT JOIN contrasena c
+//             ON u.untitled_id = c.untitled_id
+//             WHERE u.untitled_id = ? AND c.extenstions = ?
+//         `;
+
+//         let [getPasswordResult] = await connection.query(getPasswordQuery, [untitled_id, extenstions]);
+        
+//         if (getPasswordResult.length === 0) {
+//             return res.status(404).json({ status: 404, message: "No record found" });
+//         }
+        
+//         // Fix typo: Use "extenstions" instead of "extensions"
+//         const extValue = getPasswordResult[0].extenstions;
+//         const plainTextPassword = passwordMap[extValue] || "Unknown";
+        
+//         console.log(plainTextPassword);
+//         return res.status(200).json({
+//             status: 200,
+//             message: "Password retrieved successfully",
+//             password: plainTextPassword
+//         });
+
+//     } catch (error) {
+//         console.log(error);
+//         return error500(error, res);
+//     } finally {
+//         await connection.release();
+//     }
+// };
+
+
+
 
 
 
@@ -713,7 +798,8 @@ module.exports = {
     onStatusChange,
     getUserWma,
     getUserCount,
-    onChangePassword
+    onChangePassword,
+    // getPassword
     
 
 }
