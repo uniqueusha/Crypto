@@ -624,7 +624,7 @@ const currantPriceUpdateTargetComplitionStatus = async (req, res) => {
   }
 };
 
-//Get Set Target List
+//Get Set Target List untitled
 const getSetTargets = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   const { page, perPage, key } = req.query;
@@ -1522,7 +1522,7 @@ const deleteSetTargetChangeStatus = async (req, res) => {
   }
 };
 
-//set target reached list
+//set target reached list untitled
 const getSetTargetReached = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   const { page, perPage, key } = req.query;
@@ -1621,7 +1621,7 @@ const getSetTargetReached = async (req, res) => {
   }
 };
 
-//Get Sold Coin
+//Get Sold Coin untitled
 const getSoldCoin = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   const { page, perPage, key } = req.query;
@@ -1990,6 +1990,328 @@ const getDashboardDownload = async (req, res) => {
   }
 };
 
+
+//Get Set Target List all
+const getAllSetTargets = async (req, res) => {
+  const { page, perPage, key } = req.query;
+
+  // Attempt to obtain a database connection
+  let connection = await getConnection();
+  try {
+    // Start the transaction
+    await connection.beginTransaction();
+
+    let getSetTargetQuery = `SELECT s.*,u.user_name FROM sale_target_header s
+    LEFT JOIN untitled u
+    ON s.untitled_id = u.untitled_id WHERE s.status = 1`;
+    let countQuery = `SELECT COUNT(*) AS total FROM sale_target_header s
+    LEFT JOIN untitled u
+    ON s.untitled_id = u.untitled_id WHERE s.status = 1`;
+
+    if (key) {
+      const lowercaseKey = key.toLowerCase().trim();
+      if (lowercaseKey === "activated") {
+        getSetTargetQuery += ` AND s.status = 1`;
+        countQuery += ` AND status = 1`;
+      } else if (lowercaseKey === "deactivated") {
+        getSetTargetQuery += ` AND s.status = 0`;
+        countQuery += ` AND s.status = 0`;
+      } else {
+        getSetTargetQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%'`;
+        countQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%'`;
+      }
+    }
+    getSetTargetQuery += " ORDER BY s.market_cap DESC";
+    let result = await connection.query(getSetTargetQuery);
+    let setTarget = result[0];
+
+    // Apply pagination if both page and perPage are provided
+    let total = 0;
+    if (page && perPage) {
+      const totalResult = await connection.query(countQuery);
+      total = parseInt(totalResult[0][0].total);
+
+      const start = (page - 1) * perPage;
+      getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+    }
+
+    // Get set_header_footer
+    for (let i = 0; i < setTarget.length; i++) {
+      const element = setTarget[i];
+
+      // Query to fetch data from current_price table if available
+      let currentPriceQuery = `SELECT * FROM current_price WHERE sale_target_id = ${element.sale_target_id}`;
+      let currentPriceResult = await connection.query(currentPriceQuery);
+      let currentPriceData = currentPriceResult[0][0]; // First result
+
+      if (currentPriceData) {
+        // If data exists in current_price, use that and exclude sale_target_header data
+        setTarget[i].update_current_price = currentPriceData.current_price;
+        setTarget[i].market_cap = currentPriceData.market_cap;
+        setTarget[i].current_value = currentPriceData.current_value;
+        setTarget[i].fdv_ratio = currentPriceData.fdv_ratio;
+        setTarget[i].current_return_x = currentPriceData.current_return_x;
+      } else {
+        // If no data found in current_price, use sale_target_header values
+        setTarget[i].current_price = element.current_price;
+        setTarget[i].market_cap = element.market_cap;
+        setTarget[i].current_value = element.current_value;
+        setTarget[i].fdv_ratio = element.fdv_ratio;
+        setTarget[i].current_return_x = element.current_return_x;
+      }
+
+      // Fetch footer data
+      let setFooterQuery = `SELECT stf.*, ts.target_status, cs.complition_status FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
+                WHERE stf.sale_target_id = ${element.sale_target_id}`;
+      let setFooterResult = await connection.query(setFooterQuery);
+      setTarget[i]["footer"] = setFooterResult[0].reverse();
+    }
+
+    // Updated totalCurrentValue query
+    const getTotalCurrentValueQuery = `
+          SELECT (
+            COALESCE(
+              (SELECT SUM(current_value) 
+               FROM current_price 
+               WHERE status = 1),
+              0
+            ) 
+            + 
+            COALESCE(
+              (SELECT SUM(sh.current_value)
+               FROM sale_target_header sh
+               WHERE NOT EXISTS (
+                 SELECT 1 
+                 FROM current_price c 
+                 WHERE c.ticker = sh.ticker
+               ) 
+                AND sh.status = 1),
+              0
+            )
+          ) AS totalCurrentValue
+        `;
+
+    // Get total current value
+    let totalCurrentValueResult = await connection.query(
+      getTotalCurrentValueQuery
+    );
+    let totalCurrentValue = totalCurrentValueResult[0][0].totalCurrentValue;
+
+    const data = {
+      status: 200,
+      message: "Set Target retrieved successfully",
+      data: setTarget,
+      totalCurrentValue: totalCurrentValue, // Add total current value to the response
+    };
+
+    // Add pagination information if provided
+    if (page && perPage) {
+      data.pagination = {
+        per_page: perPage,
+        total: total,
+        current_page: page,
+        last_page: Math.ceil(total / perPage),
+      };
+    }
+
+    return res.status(200).json(data);
+  } catch (error) {
+    console.log(error);
+    
+    return error500(error, res);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+//Get Sold Coin All
+const getAllSoldCoin = async (req, res) => {
+  const { page, perPage, key } = req.query;
+
+  let connection = await getConnection();
+  try {
+    // Start the transaction
+    await connection.beginTransaction();
+
+    // Query to get sold coin data with calculated total and available_coins (total_coins - sale_target_coin)
+    let getSoldCoinQuery = `
+            SELECT 
+                sc.*, 
+                sf.sale_target_coin, 
+                    sth.available_coins AS total_coins, 
+    sth.available_coins - SUM(sf.sale_target_coin) OVER (PARTITION BY sf.sale_target_id ORDER BY sc.created_at) AS available_coins,
+                (sc.sold_current_price * sf.sale_target_coin) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            LEFT JOIN sale_target_header sth ON sf.sale_target_id = sth.sale_target_id
+            WHERE 1`;
+
+    let countQuery = `
+            SELECT COUNT(*) AS total 
+            FROM sold_coin sc
+            LEFT JOIN set_target_footer sf ON sc.set_footer_id = sf.set_footer_id
+            LEFT JOIN sale_target_header sth ON sf.sale_target_id = sth.sale_target_id
+            WHERE 1`;
+
+    // Filtering by key if provided
+    if (key) {
+      const lowercaseKey = key.toLowerCase().trim();
+      if (lowercaseKey === "activated") {
+        getSoldCoinQuery += ` AND sc.status = 1`;
+        countQuery += ` AND sc.status = 1`;
+      } else if (lowercaseKey === "deactivated") {
+        getSoldCoinQuery += ` AND sc.status = 0`;
+        countQuery += ` AND sc.status = 0`;
+      } else {
+        getSoldCoinQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
+        countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
+      }
+    }
+
+    getSoldCoinQuery += " ORDER BY sc.created_at DESC";
+
+    // Apply pagination if both page and perPage are provided
+    let totalRecords = 0;
+    if (page && perPage) {
+      const totalResult = await connection.query(countQuery);
+      totalRecords = parseInt(totalResult[0][0].total);
+
+      const start = (page - 1) * perPage;
+      getSoldCoinQuery += ` LIMIT ${perPage} OFFSET ${start}`;
+    }
+
+    const result = await connection.query(getSoldCoinQuery);
+    const soldCoin = result[0];
+
+    // Calculate the sum of total column
+    const totalSum = soldCoin.reduce((sum, item) => sum + (item.total || 0), 0);
+
+    const data = {
+      status: 200,
+      message: "Sold Coin retrieved successfully",
+      data: soldCoin,
+      totalSum: totalSum, // Adding total sum to the response
+    };
+
+    // Add pagination information if provided
+    if (page && perPage) {
+      data.pagination = {
+        per_page: perPage,
+        total: totalRecords,
+        current_page: page,
+        last_page: Math.ceil(totalRecords / perPage),
+      };
+    }
+
+    return res.status(200).json(data);
+  } catch (error) {
+    return error500(error, res);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+//set target reached list All
+const getAllSetTargetReached = async (req, res) => {
+  const { page, perPage, key } = req.query;
+
+  let connection = await getConnection();
+  try {
+    await connection.beginTransaction();
+
+    let getSetTargetQuery = `
+            SELECT * FROM sale_target_header 
+            WHERE status = 1`;
+
+    if (key) {
+      const lowercaseKey = key.toLowerCase().trim();
+      if (lowercaseKey === "activated") {
+        getSetTargetQuery += ` AND status = 1`;
+      } else if (lowercaseKey === "deactivated") {
+        getSetTargetQuery += ` AND status = 0`;
+      } else {
+        getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
+      }
+    }
+
+    getSetTargetQuery += " ORDER BY market_cap DESC";
+    let result = await connection.query(getSetTargetQuery);
+    let setTarget = result[0];
+
+    for (let i = 0; i < setTarget.length; i++) {
+      const element = setTarget[i];
+
+      let setFooterQuery = `
+                SELECT stf.*, ts.target_status, cs.complition_status 
+                FROM set_target_footer stf
+                LEFT JOIN target_status ts ON ts.target_id = stf.target_id
+                LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id 
+                WHERE stf.sale_target_id = ${element.sale_target_id} 
+                `;
+      const setFooterResult = await connection.query(setFooterQuery);
+      element["footer"] = setFooterResult[0].reverse();
+
+      let currentPriceQuery = `
+                SELECT current_price AS update_current_price, market_cap, current_value, fdv_ratio, current_return_x 
+                FROM current_price 
+                WHERE sale_target_id = ${element.sale_target_id}`;
+      const currentPriceResult = await connection.query(currentPriceQuery);
+      const currentPriceData = currentPriceResult[0][0];
+
+      if (currentPriceData) {
+        element["update_current_price"] = currentPriceData.update_current_price;
+        element["market_cap"] = currentPriceData.market_cap;
+        element["current_value"] = currentPriceData.current_value;
+        element["fdv_ratio"] = currentPriceData.fdv_ratio;
+        element["current_return_x"] = currentPriceData.current_return_x;
+      } else {
+        element["current_price"] = element.current_price;
+        element["market_cap"] = element.market_cap;
+        element["current_value"] = element.current_value;
+        element["fdv_ratio"] = element.fdv_ratio;
+        element["current_return_x"] = element.current_return_x;
+      }
+    }
+
+    let filteredData = setTarget.filter((element) =>
+      element.footer.some((footer) => footer.target_id === 2)
+    );
+
+    const total = filteredData.length;
+    let paginatedData = filteredData;
+
+    if (page && perPage) {
+      const start = (page - 1) * perPage;
+      paginatedData = filteredData.slice(start, start + parseInt(perPage, 10));
+    }
+
+    const responseData = {
+      status: 200,
+      message: "Set Target retrieved successfully",
+      data: paginatedData,
+    };
+
+    if (page && perPage) {
+      responseData.pagination = {
+        page: parseInt(page, 10),
+        per_page: parseInt(perPage, 10),
+        total: total,
+        current_page: parseInt(page, 10),
+        last_page: Math.ceil(total / perPage),
+      };
+    }
+
+    return res.status(200).json(responseData);
+  } catch (error) {
+    return error500(error, res);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 module.exports = {
   addSaleTargetHeader,
   currantPriceUpdateTargetComplitionStatus,
@@ -2007,4 +2329,7 @@ module.exports = {
   getSoldCoinDownload,
   getDashboardDownload,
   checkCoinExchange,
+  getAllSetTargets,
+  getAllSoldCoin,
+  getAllSetTargetReached
 };
