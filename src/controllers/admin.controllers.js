@@ -799,7 +799,7 @@ module.exports = {
     getUserWma,
     getUserCount,
     onChangePassword,
-    getPassword
+    // getPassword
     
 
 }
