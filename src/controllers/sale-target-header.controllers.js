@@ -1546,7 +1546,7 @@ const getSetTargetReached = async (req, res) => {
       }
     }
 
-    getSetTargetQuery += " ORDER BY market_cap DESC";
+    getSetTargetQuery += " ORDER BY CAST(market_cap AS DECIMAL(20,2)) DESC";
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
 
@@ -2027,7 +2027,7 @@ const getAllSetTargets = async (req, res) => {
       countQuery += ` AND s.untitled_id = ${untitled_id}`;
   }
 
-    getSetTargetQuery += " ORDER BY s.market_cap DESC";
+    getSetTargetQuery += " ORDER BY CAST(s.market_cap AS DECIMAL(20,2)) DESC ";
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
 
@@ -2107,7 +2107,7 @@ const getAllSetTargets = async (req, res) => {
 
     const data = {
       status: 200,
-      message: "Set Target retrieved successfully",
+      message: "All Set Target retrieved successfully",
       data: setTarget,
       totalCurrentValue: totalCurrentValue, // Add total current value to the response
     };
@@ -2200,7 +2200,7 @@ const getAllSoldCoin = async (req, res) => {
 
     const data = {
       status: 200,
-      message: "Sold Coin retrieved successfully",
+      message: " All Sold Coin retrieved successfully",
       data: soldCoin,
       totalSum: totalSum, // Adding total sum to the response
     };
@@ -2252,7 +2252,7 @@ const getAllSetTargetReached = async (req, res) => {
       
   }
 
-    getSetTargetQuery += " ORDER BY market_cap DESC";
+    getSetTargetQuery += " ORDER BY CAST(market_cap AS DECIMAL(20,2)) DESC ";
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
 
@@ -2305,7 +2305,7 @@ const getAllSetTargetReached = async (req, res) => {
 
     const responseData = {
       status: 200,
-      message: "Set Target retrieved successfully",
+      message: " All Set Target Reached retrieved successfully",
       data: paginatedData,
     };
 

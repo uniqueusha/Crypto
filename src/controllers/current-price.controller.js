@@ -26,6 +26,7 @@ error500 = (error, res) => {
   });
 };
 
+//current price untitled
 const addCurrentPrice = async (req, res) => {
   const untitledId = req.companyData.untitled_id;
   let connection;
@@ -280,12 +281,142 @@ const getCurrentprice = async (req, res) => {
 // };
 
 
+const addCurrentPriceAll = async (req, res) => {
+  let connection;
 
+  try {
+    connection = await getConnection();
+    await connection.beginTransaction();
 
+    // Fetch all sale_target_id, ticker, base_price, available_coins, fdv_ratio, and market_cap
+    let saleTargetQuery = `
+      SELECT sale_target_id, ticker, base_price, available_coins, fdv_ratio AS header_fdv_ratio, market_cap AS header_market_cap 
+      FROM sale_target_header 
+      WHERE status = 1
+    `;
+    const [saleTargetResult] = await connection.query(saleTargetQuery);
 
+    if (!saleTargetResult.length) {
+      throw new Error("No tickers found with status = 1 in the database.");
+    }
 
+    const saleTargetData = saleTargetResult;
+
+    // Construct ticker list for API call
+    const tickers = Array.from(new Set(saleTargetData.map((element) => element.ticker))).join(",");
+
+    // Fetch API settings
+    const apiSettingsQuery = `SELECT url, ticker, currency_name FROM api_settings`;
+    const [apiSettingsResult] = await connection.query(apiSettingsQuery);
+
+    const apiUrl = apiSettingsResult.map(
+      (row) => `${row.url}${tickers}${row.currency_name}`
+    )[0]; // Assuming the first URL is valid
+
+    // Fetch current price data from the API
+    const currentPriceResponse = await axios.get(apiUrl);
+    const currentPriceData = currentPriceResponse.data;
+
+    // Fetch market cap data from API
+    const mktResponse = await axios.get(
+      `https://min-api.cryptocompare.com/data/top/mktcapfull?limit=100&tsym=USD`
+    );
+
+    // Iterate over all sale_target_data
+    for (const saleTarget of saleTargetData) {
+      const { sale_target_id, ticker, base_price, available_coins, header_fdv_ratio, header_market_cap } = saleTarget;
+
+      // Fetch the current price for this ticker
+      const price = currentPriceData[ticker]?.USD;
+
+      let fdv_ratio = null;
+      let mktcap = null;
+
+      if (mktResponse.data && mktResponse.data.Data) {
+        // Get data for this ticker
+        const coinData = mktResponse.data.Data.find(
+          (coin) => coin.CoinInfo.Name === ticker
+        );
+
+        if (coinData && coinData.RAW && coinData.RAW.USD) {
+          fdv_ratio = coinData.RAW.USD.CIRCULATINGSUPPLY / coinData.RAW.USD.SUPPLY;
+          mktcap = fdv_ratio * coinData.RAW.USD.MKTCAP;
+        }
+      }
+
+      // If API did not provide values, use values from sale_target_header
+      if (!fdv_ratio) fdv_ratio = header_fdv_ratio;
+      if (!mktcap) mktcap = header_market_cap;
+
+      if (price) {
+        // Calculate current_return_x (current_price / base_price)
+        const current_return_x = base_price > 0 ? price / base_price : 0;
+
+        // Calculate current_value = current_price * available_coins
+        const current_value = price * available_coins;
+
+        // Check if the combination of ticker and untitled_id already exists
+        const checkExistsQuery = `
+          SELECT COUNT(*) AS count 
+          FROM current_price 
+          WHERE ticker = ?
+        `;
+        const [checkExistsResult] = await connection.query(checkExistsQuery, [ticker]);
+
+        if (checkExistsResult[0].count > 0) {
+          // Update existing record
+          const updateQuery = `
+            UPDATE current_price 
+            SET current_price = ?, current_return_x = ?, fdv_ratio = ?, market_cap = ?, current_value = ? 
+            WHERE ticker = ?
+          `;
+          await connection.query(updateQuery, [
+            price,
+            current_return_x,
+            fdv_ratio,
+            mktcap,
+            current_value,
+            ticker
+          ]);
+        } else {
+          // Insert new record
+          const insertQuery = `
+            INSERT INTO current_price (ticker, current_price, current_return_x, fdv_ratio, market_cap, current_value, sale_target_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `;
+          await connection.query(insertQuery, [
+            ticker,
+            price,
+            current_return_x,
+            fdv_ratio,
+            mktcap,
+            current_value,
+            sale_target_id
+          ]);
+        }
+      }
+    }
+
+    // Commit the transaction
+    await connection.commit();
+
+    res.status(200).json({
+      status: 200,
+      message: `All current price added/updated successfully.`,
+    });
+
+  } catch (error) {
+    console.log(error);
+    
+    if (connection) await connection.rollback();
+    return error500(error, res);
+  } finally {
+    if (connection) connection.release();
+  }
+};
 
 module.exports = {
   addCurrentPrice,
   getCurrentprice,
+  addCurrentPriceAll
 };
