@@ -651,7 +651,7 @@ const getSetTargets = async (req, res) => {
         countQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
       }
     }
-    getSetTargetQuery += " ORDER BY market_cap DESC";
+    getSetTargetQuery += " ORDER BY CAST(market_cap AS DECIMAL(20,2)) DESC ";
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
 
@@ -2124,7 +2124,7 @@ const getAllSetTargets = async (req, res) => {
 
     return res.status(200).json(data);
   } catch (error) {
-  
+    
     return error500(error, res);
   } finally {
     if (connection) connection.release();
