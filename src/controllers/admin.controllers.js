@@ -730,8 +730,6 @@ const onChangePassword = async (req, res) => {
 //     }
 // };
 
-
-
 // const getPassword = async (req, res) => {
 //     const { untitled_id } = req.query;
 //     const extenstions = req.body.extenstions ? req.body.extenstions.trim() : "";
@@ -780,13 +778,6 @@ const onChangePassword = async (req, res) => {
 //         await connection.release();
 //     }
 // };
-
-
-
-
-
-
-
 
 
 module.exports = {
