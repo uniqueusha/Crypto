@@ -2238,8 +2238,8 @@ const getAllSetTargetReached = async (req, res) => {
     }
 
     if (untitled_id) {
-      getAdhaQuery += ` AND untitled_id = ${untitled_id}`;
-      countQuery += `  AND untitled_id = ${untitled_id}`;
+      getSetTargetQuery += ` AND untitled_id = ${untitled_id}`;
+      
   }
 
     getSetTargetQuery += " ORDER BY market_cap DESC";
