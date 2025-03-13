@@ -5,6 +5,7 @@ const checkAuth = require("../middleware/check.auth");
 
 //Add Current Price
 router.post('/add-update', checkAuth, currentPriceController.addCurrentPrice);
+router.post('/all-add-update', currentPriceController.addCurrentPriceAll);
 //Get List
 router.get('/',checkAuth, currentPriceController.getCurrentprice);
 // //login
