@@ -2216,7 +2216,7 @@ const getAllSoldCoin = async (req, res) => {
 
 //set target reached list All
 const getAllSetTargetReached = async (req, res) => {
-  const { page, perPage, key } = req.query;
+  const { page, perPage, key, untitled_id } = req.query;
 
   let connection = await getConnection();
   try {
@@ -2236,6 +2236,11 @@ const getAllSetTargetReached = async (req, res) => {
         getSetTargetQuery += ` AND LOWER(coin) LIKE '%${lowercaseKey}%'`;
       }
     }
+
+    if (untitled_id) {
+      getAdhaQuery += ` AND untitled_id = ${untitled_id}`;
+      countQuery += `  AND untitled_id = ${untitled_id}`;
+  }
 
     getSetTargetQuery += " ORDER BY market_cap DESC";
     let result = await connection.query(getSetTargetQuery);
