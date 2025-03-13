@@ -1993,7 +1993,7 @@ const getDashboardDownload = async (req, res) => {
 
 //Get Set Target List all
 const getAllSetTargets = async (req, res) => {
-  const { page, perPage, key } = req.query;
+  const { page, perPage, key,untitled_id } = req.query;
 
   // Attempt to obtain a database connection
   let connection = await getConnection();
@@ -2021,6 +2021,12 @@ const getAllSetTargets = async (req, res) => {
         countQuery += ` AND LOWER(u.user_name) LIKE '%${lowercaseKey}%'`;
       }
     }
+
+    if (untitled_id) {
+      getSetTargetQuery += ` AND s.untitled_id = ${untitled_id}`;
+      countQuery += ` AND s.untitled_id = ${untitled_id}`;
+  }
+
     getSetTargetQuery += " ORDER BY s.market_cap DESC";
     let result = await connection.query(getSetTargetQuery);
     let setTarget = result[0];
@@ -2118,8 +2124,7 @@ const getAllSetTargets = async (req, res) => {
 
     return res.status(200).json(data);
   } catch (error) {
-    console.log(error);
-    
+  
     return error500(error, res);
   } finally {
     if (connection) connection.release();
@@ -2128,7 +2133,7 @@ const getAllSetTargets = async (req, res) => {
 
 //Get Sold Coin All
 const getAllSoldCoin = async (req, res) => {
-  const { page, perPage, key } = req.query;
+  const { page, perPage, key, untitled_id } = req.query;
 
   let connection = await getConnection();
   try {
@@ -2169,6 +2174,11 @@ const getAllSoldCoin = async (req, res) => {
         countQuery += ` AND LOWER(sc.coin) LIKE '%${lowercaseKey}%' `;
       }
     }
+
+    if (untitled_id) {
+      getSoldCoinQuery += ` AND sth.untitled_id = ${untitled_id}`;
+      countQuery += ` AND sth.untitled_id = ${untitled_id}`;
+  }
 
     getSoldCoinQuery += " ORDER BY sc.created_at DESC";
 
