@@ -1229,7 +1229,7 @@ const updateSetTarget = async (req, res) => {
   const setTargetFooter = req.body.setTargetFooter || [];
   const untitled_id = req.companyData.untitled_id;
 
-  if (!ticker) return error422("Ticker is required.", res);
+  // if (!ticker) return error422("Ticker is required.", res);
   
 
   const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
@@ -1254,6 +1254,7 @@ const updateSetTarget = async (req, res) => {
       ticker,
       coin,
       exchange,
+      base_price,
       currant_price,
       current_value,
       current_return_x,
