@@ -2,7 +2,6 @@ const pool = require("../../db");
 const axios = require("axios");
 const xlsx = require("xlsx");
 const fs = require("fs");
-const { log } = require("console");
 
 // Function to obtain a database connection
 const getConnection = async () => {
@@ -172,15 +171,9 @@ const addSaleTargetHeader = async (req, res) => {
   const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
   const untitled_id = req.companyData.untitled_id;
 
-  if (!coin) {
-    return error422("Coin is required.", res);
-  } else if (!base_price) {
-    return error422("Base Price is required.", res);
-  } else if (!return_x) {
-    return error422("Return_x is required.", res);
-  } else if (!available_coins) {
-    return error422("Available Coins is required.", res);
-  }
+  if (!ticker) {
+    return error422("Ticker is required.", res);
+  } 
 
   let connection = await getConnection();
 
@@ -1236,9 +1229,8 @@ const updateSetTarget = async (req, res) => {
   const setTargetFooter = req.body.setTargetFooter || [];
   const untitled_id = req.companyData.untitled_id;
 
-  if (!coin) return error422("Coin is required.", res);
-  if (!return_x) return error422("Return_x is required.", res);
-  if (!available_coins) return error422("Available Coins is required.", res);
+  if (!ticker) return error422("Ticker is required.", res);
+  
 
   const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
   const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [sale_target_id]);
@@ -1252,7 +1244,7 @@ const updateSetTarget = async (req, res) => {
 
     const updatesaleTargetHeaderQuery = `
       UPDATE sale_target_header 
-      SET ticker = ?, coin = ?, exchange = ?, currant_price = ?, 
+      SET ticker = ?, coin = ?, exchange = ?, base_price = ?, currant_price = ?, 
           current_value = ?, current_return_x = ?, market_cap = ?, 
           return_x = ?, final_sale_price = ?, available_coins = ?, 
           timeframe = ?, fdv_ratio = ?, narrative = ? 

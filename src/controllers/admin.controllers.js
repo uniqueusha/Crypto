@@ -498,7 +498,7 @@ const getUserWma = async (req, res) => {
         await connection.beginTransaction();
         // Start a transaction
         let userQuery = `SELECT * FROM untitled
-        WHERE untitled_id != 3 AND status = 1 ORDER BY user_name `;
+        WHERE untitled_id != 10 AND status = 1 ORDER BY user_name `;
         const userResult = await connection.query(userQuery);
         const user = userResult[0];
 
