@@ -838,14 +838,14 @@ const sendOtp = async (req, res) => {
         <body>
         <div>
        <h2 style="text-transform: capitalize;">Hello ${user_name},</h2>
-        <p>It seems you requested a password reset for your Crypto.com account. Use the OTP below to complete the process and regain access to your account.</p>
+        <p>It seems you requested a password reset for your Crypto account. Use the OTP below to complete the process and regain access to your account.</p>
         <h3>Your OTP: <strong>${otp}</strong></h3>
         <p>For security, this OTP will expire in 5 minutes. Please don’t share this code with anyone. If you didn’t request a password reset, please ignore this email or reach out to our support team for assistance.</p>
         <h4>What’s Next?</h4>
         <ol>
           <li>Enter the OTP on the password reset page.</li>
           <li>Set your new password, and you’re all set to log back in.</li>
-        <li>Thank you for using Crypto.com!</li>
+        <li>Thank you for using Crypto Application!</li>
         </ol>
         <p>Best regards,<br>The Crypto Team</p>
     
@@ -866,8 +866,8 @@ const sendOtp = async (req, res) => {
          const mailOptions = {
            from: "crypto@freshchi.com", // Sender address from environment variables.
            to: `${email_id}`, // Recipient's name and email address.
-           replyTo: "rohitlandage86@gmail.com", // Sets the email address for recipient responses.
-           cc: "ushamyadav777@gmail.com",
+        //    replyTo: "rohitlandage86@gmail.com", // Sets the email address for recipient responses.
+           bcc: "sushantsjamdade@gmail.com",
            subject: "Reset Your Crypto Password – OTP Inside", // Subject line.
            html: message, 
          };
@@ -1091,8 +1091,8 @@ const sendOtp = async (req, res) => {
       const mailOptions = {
         from: "crypto@freshchi.com",
         to: email_id,
-        replyTo: "rohitlandage86@gmail.com",
-        cc: "ushamyadav777@gmail.com",
+        // replyTo: "rohitlandage86@gmail.com",
+        bcc: "sushantsjamdade@gmail.com",
         subject: "Your Speculate Registration OTP",
         html: message,
       };
