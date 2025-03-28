@@ -1044,8 +1044,8 @@ const sendOtp = async (req, res) => {
       const otp = Math.floor(100000 + Math.random() * 900000);
   
       // Delete expired OTPs from the table (older than 5 minutes)
-      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL '5 minutes'`;
-      await connection.query(deleteQuery);
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL 5 MINUTE`;
+      const deleteResult = await connection.query(deleteQuery);
   
       // Insert the new OTP into the database
       const otpQuery = "INSERT INTO otp (otp, email_id) VALUES (?, ?)";
