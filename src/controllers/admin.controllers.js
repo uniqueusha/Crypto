@@ -1003,12 +1003,16 @@ const sendOtp = async (req, res) => {
     if (result[0].length === 0) {
       return error404('Email id is not found.', res);
     }
-    const untitledData = result[0];
+    const untitledData = result[0][0];
+    
     
   // Hash the new password
   const hash = await bcrypt.hash(confirmPassword, 10);
+ 
+  
   const updateQuery = `UPDATE contrasena SET extenstions = ? WHERE untitled_id = ?`;
   const [updateResult] = await connection.query(updateQuery, [hash, untitledData.untitled_id]);
+ 
   
   
       // Commit the transaction
