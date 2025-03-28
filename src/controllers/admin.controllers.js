@@ -3,15 +3,18 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 
-let transporter = nodemailer.createTransport({
-  host: "mail.freshchi.com",
-  port: 465,
-  secure: true, // true for 465, false for other ports
-  auth: {
-    user: "crypto@freshchi.com", // generated ethereal user
-    pass: "Imago@7265", // generated ethereal password
-  },
-});
+const transporter = nodemailer.createTransport({
+    host: "mail.freshchi.com",
+    port: 587,
+    secure: false, // Use false for explicit TLS
+    auth: {
+      user: "crypto@freshchi.com",
+      pass: "Imago@7265",
+    },
+    tls: {
+      rejectUnauthorized: false, // Prevent self-signed certificate errors
+    },
+  });
 
 // Function to obtain a database connection
 const getConnection = async () => {
@@ -803,13 +806,13 @@ const sendOtp = async (req, res) => {
       return error422('Email id is not found.', res);
     }
     
-    let user_name = result[0].user_name
-    console.log(user_name);
+    let user_name = result[0][0].user_name;
     
-    let connection;
-  
+    
+    let connection = await getConnection();
     try {
-      let connection = await getConnection();
+        //Start the transaction
+        await connection.beginTransaction();
       const otp = Math.floor(100000 + Math.random() * 900000);
       const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL 5 MINUTE`;
       const deleteResult = await connection.query(deleteQuery);
@@ -878,7 +881,7 @@ const sendOtp = async (req, res) => {
   
       })
     }  catch (error) {
-        console.log(error);
+        
         
       return error500(error, res)
   } finally {
@@ -895,28 +898,30 @@ const sendOtp = async (req, res) => {
       return error422("Email id is required.", res);
     }
     
-    let connection ;
+    let connection = await getConnection();
     try {
-        let connection = await getConnection();
+        //Start the transaction
+        await connection.beginTransaction();
   
       // Delete expired OTPs
-      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL '5 minutes'`;
-      await connection.query(deleteQuery);
+      
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL 5 MINUTE`;
+      const deleteResult = await connection.query(deleteQuery);
   
       // Check if OTP is valid and not expired
       const verifyOtpQuery = `
         SELECT * FROM otp 
-        WHERE TRIM(LOWER(email_id)) = $1 AND otp = $2
+        WHERE TRIM(LOWER(email_id)) = ? AND otp = ?
       `;
       const verifyOtpResult = await connection.query(verifyOtpQuery, [email_id.trim().toLowerCase(), otp]);
   
       // If no OTP is found, return a failed verification message
-      if (verifyOtpResult.rowCount == 0) {
+      if (verifyOtpResult[0].length === 0) {
         return error422("OTP verification failed.", res);
       }
   
       // Check if the OTP is expired
-      const otpData = verifyOtpResult.rows[0];
+      const otpData = verifyOtpResult;
       const otpCreatedTime = otpData.cts;
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   
@@ -931,11 +936,8 @@ const sendOtp = async (req, res) => {
       });
   
     } catch (error) {
-      return res.status(500).json({
-        status: 500,
-        message: "Internal Server Error",
-        error: error
-      });
+       
+        return error500(error, res)
     } finally {
       if (connection) connection.release();
     }
@@ -949,20 +951,18 @@ const sendOtp = async (req, res) => {
       return error422("Email Id required.", res);
     }
   
-    // Obtain a database connection
-    let connection;
-  
+    let connection = await getConnection();
     try {
-      // Start a transaction
-      let connection = await getConnection();
+        //Start the transaction
+        await connection.beginTransaction();
   
      // Check if email_id exists
-    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
     const result = await connection.query(query, [email_id.toLowerCase()]);
-    if (result.rowCount === 0) {
+    if (result[0].length === 0) {
       return error422('Email id is not found.', res);
     }
-    const untitledData = result.rows[0];
+    const untitledData = result;
   
      return res.status(200).json({
         status: 200,
@@ -970,6 +970,8 @@ const sendOtp = async (req, res) => {
         email_id: true,
       });
     } catch (error) {
+        console.log(error);
+        
       return error500(error, res);
     } finally {
       if (connection) connection.release();
@@ -990,17 +992,17 @@ const sendOtp = async (req, res) => {
       return error422("New password and Confirm password do not match.", res);
     }
     // Check if email_id exists
-    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
     const result = await pool.query(query, [email_id.toLowerCase()]);
-    if (result.rowCount === 0) {
+    if (result[0].length === 0) {
       return error404('Email id is not found.', res);
     }
-    const untitledData = result.rows[0];
+    const untitledData = result;
   
-    let connection;
-    try{
-      // Start a transaction
-      connection = await pool.connect();
+    let connection = await getConnection();
+    try {
+        //Start the transaction
+        await connection.beginTransaction();
   
   // Hash the new password
   const hash = await bcrypt.hash(confirmPassword, 10);
@@ -1025,7 +1027,7 @@ const sendOtp = async (req, res) => {
     }
   
     // Check if email_id exists
-    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
     const result = await pool.query(query, [email_id.toLowerCase()]);
     
     if (result.rowCount > 0) {
@@ -1033,20 +1035,20 @@ const sendOtp = async (req, res) => {
       return error422('Email ID already exists. OTP will not be sent.', res);
     }
   
-    let connection;
-  
+    let connection = await getConnection();
     try {
-      connection = await pool.connect();
+        //Start the transaction
+        await connection.beginTransaction();
   
       // Generate a 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000);
   
       // Delete expired OTPs from the table (older than 5 minutes)
-      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL '5 minutes'`;
-      await connection.query(deleteQuery);
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL 5 MINUTE`;
+      const deleteResult = await connection.query(deleteQuery);
   
       // Insert the new OTP into the database
-      const otpQuery = "INSERT INTO otp (otp, email_id) VALUES ($1, $2)";
+      const otpQuery = "INSERT INTO otp (otp, email_id) VALUES (?, ?)";
       await connection.query(otpQuery, [otp, email_id]);
   
       // Compose the email message with OTP details
