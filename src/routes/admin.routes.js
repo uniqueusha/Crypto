@@ -23,4 +23,10 @@ router.put('/:id',userController.updateUser);
 //update status
 router.patch('/:id',userController.onStatusChange);
 
+router.post('/send-otp',userController.sendOtp);
+router.post('/verify-otp',userController.verifyOtp);
+router.post('/check-emailid',userController.checkEmailId);
+router.post('/forgot-Password',userController.forgotPassword);
+router.post('/send-otp-if-email-not-exists',userController.sendOtpIfEmailIdNotExists);
+
 module.exports = router

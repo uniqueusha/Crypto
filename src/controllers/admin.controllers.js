@@ -1,6 +1,17 @@
 const pool = require("../../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+
+let transporter = nodemailer.createTransport({
+  host: "mail.freshchi.com",
+  port: 465,
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: "crypto@freshchi.com", // generated ethereal user
+    pass: "Imago@7265", // generated ethereal password
+  },
+});
 
 // Function to obtain a database connection
 const getConnection = async () => {
@@ -779,7 +790,318 @@ const onChangePassword = async (req, res) => {
 //     }
 // };
 
+//send otp 
+const sendOtp = async (req, res) => {
+    const email_id = req.body.email_id;
+    if (!email_id) {
+      return error422("Email is  required.", res);
+    }
+    // Check if email_id exists
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
+    const result = await pool.query(query, [email_id.toLowerCase()]);
+    if (result[0].length === 0) {
+      return error422('Email id is not found.', res);
+    }
+    
+    let user_name = result[0].user_name
+    console.log(user_name);
+    
+    let connection;
+  
+    try {
+      let connection = await getConnection();
+      const otp = Math.floor(100000 + Math.random() * 900000);
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL 5 MINUTE`;
+      const deleteResult = await connection.query(deleteQuery);
 
+      const otpQuery = "INSERT INTO otp (otp, email_id) VALUES (?, ?)";
+      const otpResult = await connection.query(otpQuery, [otp, email_id])
+  
+      const message = `
+      <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Welcome to Crypto.com</title>
+          <style>
+              div{
+              font-family: Arial, sans-serif; 
+               margin: 0px;
+                padding: 0px;
+                color:black;
+              }
+          </style>
+        </head>
+        <body>
+        <div>
+       <h2 style="text-transform: capitalize;">Hello ${user_name},</h2>
+        <p>It seems you requested a password reset for your Crypto.com account. Use the OTP below to complete the process and regain access to your account.</p>
+        <h3>Your OTP: <strong>${otp}</strong></h3>
+        <p>For security, this OTP will expire in 5 minutes. Please don’t share this code with anyone. If you didn’t request a password reset, please ignore this email or reach out to our support team for assistance.</p>
+        <h4>What’s Next?</h4>
+        <ol>
+          <li>Enter the OTP on the password reset page.</li>
+          <li>Set your new password, and you’re all set to log back in.</li>
+        <li>Thank you for using Crypto.com!</li>
+        </ol>
+        <p>Best regards,<br>The Crypto Team</p>
+    
+  
+         </div>
+        </body>
+        </html>
+     `;
+     
+         // Validate required fields.
+         if ( !email_id || !message) {
+           return res
+             .status(400)
+             .json({ status: "error", message: "Missing required fields" });
+         }
+     
+         // Prepare the email message options.
+         const mailOptions = {
+           from: "crypto@freshchi.com", // Sender address from environment variables.
+           to: `${email_id}`, // Recipient's name and email address.
+           replyTo: "rohitlandage86@gmail.com", // Sets the email address for recipient responses.
+           cc: "ushamyadav777@gmail.com",
+           subject: "Reset Your Crypto Password – OTP Inside", // Subject line.
+           html: message, 
+         };
+     
+         // Send email 
+          await transporter.sendMail(mailOptions);
+     
+      return res.status(200).json({
+        status: 200,
+        message: `OTP sent successfully to ${email_id}.`,
+  
+      })
+    }  catch (error) {
+        console.log(error);
+        
+      return error500(error, res)
+  } finally {
+      if (connection) connection.release()
+  }
+  }
+  
+  const verifyOtp = async (req, res) => {
+    const otp = req.body.otp ? req.body.otp : null;
+    const email_id = req.body.email_id ? req.body.email_id.trim() : null;
+    if (!otp) {
+      return error422("Otp is required.", res);
+    } else if (!email_id) {
+      return error422("Email id is required.", res);
+    }
+    
+    let connection ;
+    try {
+        let connection = await getConnection();
+  
+      // Delete expired OTPs
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL '5 minutes'`;
+      await connection.query(deleteQuery);
+  
+      // Check if OTP is valid and not expired
+      const verifyOtpQuery = `
+        SELECT * FROM otp 
+        WHERE TRIM(LOWER(email_id)) = $1 AND otp = $2
+      `;
+      const verifyOtpResult = await connection.query(verifyOtpQuery, [email_id.trim().toLowerCase(), otp]);
+  
+      // If no OTP is found, return a failed verification message
+      if (verifyOtpResult.rowCount == 0) {
+        return error422("OTP verification failed.", res);
+      }
+  
+      // Check if the OTP is expired
+      const otpData = verifyOtpResult.rows[0];
+      const otpCreatedTime = otpData.cts;
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  
+      if (otpCreatedTime < fiveMinutesAgo) {
+        return error422("OTP has expired. Please request a new one.", res);
+      }
+  
+      // OTP is valid and within the 5-minute limit
+      return res.status(200).json({
+        status: 200,
+        message: "OTP verified successfully"
+      });
+  
+    } catch (error) {
+      return res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+        error: error
+      });
+    } finally {
+      if (connection) connection.release();
+    }
+  };
+  
+  //check email_id
+  const checkEmailId = async (req, res) => {
+    const email_id = req.body.email_id ? req.body.email_id.trim() : ""; // Extract and trim email_id from request body
+  
+    if (!email_id) {
+      return error422("Email Id required.", res);
+    }
+  
+    // Obtain a database connection
+    let connection;
+  
+    try {
+      // Start a transaction
+      let connection = await getConnection();
+  
+     // Check if email_id exists
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const result = await connection.query(query, [email_id.toLowerCase()]);
+    if (result.rowCount === 0) {
+      return error422('Email id is not found.', res);
+    }
+    const untitledData = result.rows[0];
+  
+     return res.status(200).json({
+        status: 200,
+        message: "Email Id Exists",
+        email_id: true,
+      });
+    } catch (error) {
+      return error500(error, res);
+    } finally {
+      if (connection) connection.release();
+    }
+  };
+  //forget password
+  const forgotPassword = async (req, res) => {
+    const email_id = req.body.email_id ? req.body.email_id.trim() : null;
+    const newPassword = req.body.newPassword ? req.body.newPassword.trim() : null;
+    const confirmPassword = req.body.confirmPassword ? req.body.confirmPassword.trim() : null;
+    if (!email_id) {
+      return error422("Email id is requried", res);
+    } else if (!newPassword) {
+      return error422("New password is required.", res);
+    } else if (!confirmPassword) {
+      return error422("Confirm password is required.", res);
+    } else if (newPassword !== confirmPassword) {
+      return error422("New password and Confirm password do not match.", res);
+    }
+    // Check if email_id exists
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const result = await pool.query(query, [email_id.toLowerCase()]);
+    if (result.rowCount === 0) {
+      return error404('Email id is not found.', res);
+    }
+    const untitledData = result.rows[0];
+  
+    let connection;
+    try{
+      // Start a transaction
+      connection = await pool.connect();
+  
+  // Hash the new password
+  const hash = await bcrypt.hash(confirmPassword, 10);
+  const updateQuery = `UPDATE contrasena SET extenstions = ? WHERE untitled_id = ?`;
+  await connection.query(updateQuery, [hash, untitledData.untitled_id]);
+      // Commit the transaction
+      await connection.query("COMMIT");
+      return res.status(200).json({
+        status: 200,
+        message: "Password has been updated successfully"
+      })
+    }catch (error) {
+      return error500(error, res);
+    } finally {
+      if(connection) connection.release();
+    }
+  }
+  const sendOtpIfEmailIdNotExists = async (req, res) => {
+    const email_id = req.body.email_id;
+    if (!email_id) {
+      return error422("Email is required.", res);
+    }
+  
+    // Check if email_id exists
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = $1';
+    const result = await pool.query(query, [email_id.toLowerCase()]);
+    
+    if (result.rowCount > 0) {
+      // If email_id exists, return an error response
+      return error422('Email ID already exists. OTP will not be sent.', res);
+    }
+  
+    let connection;
+  
+    try {
+      connection = await pool.connect();
+  
+      // Generate a 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000);
+  
+      // Delete expired OTPs from the table (older than 5 minutes)
+      const deleteQuery = `DELETE FROM otp WHERE cts < NOW() - INTERVAL '5 minutes'`;
+      await connection.query(deleteQuery);
+  
+      // Insert the new OTP into the database
+      const otpQuery = "INSERT INTO otp (otp, email_id) VALUES ($1, $2)";
+      await connection.query(otpQuery, [otp, email_id]);
+  
+      // Compose the email message with OTP details
+      const message = `
+      <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Welcome to Crypto.com</title>
+          <style>
+              div {
+                font-family: Arial, sans-serif; 
+                margin: 0px;
+                padding: 0px;
+                color: black;
+              }
+          </style>
+        </head>
+        <body>
+        <div>
+          <h2>Hello,</h2>
+          <p>Thank you for registering at Crypto.com. Use the OTP below to complete your registration.</p>
+          <h3>Your OTP: <strong>${otp}</strong></h3>
+          <p>This OTP will expire in 5 minutes. Please don’t share this code with anyone.</p>
+          <p>Best regards,<br>The Crypto Team</p>
+          
+        </div>
+        </body>
+        </html>
+      `;
+  
+      // Email options
+      const mailOptions = {
+        from: "crypto@freshchi.com",
+        to: email_id,
+        replyTo: "rohitlandage86@gmail.com",
+        cc: "ushamyadav777@gmail.com",
+        subject: "Your Speculate Registration OTP",
+        html: message,
+      };
+  
+      // Send the email
+      await transporter.sendMail(mailOptions);
+  
+      // Return success response
+      return res.status(200).json({
+        status: 200,
+        message: `OTP sent successfully to ${email_id}.`,
+      });
+    } catch (error) {
+     return error500(error, res);
+    } finally {
+      if (connection) connection.release();
+    }
+  };
 module.exports = {
     addUser,
     userLogin,
@@ -790,7 +1112,9 @@ module.exports = {
     getUserWma,
     getUserCount,
     onChangePassword,
-    // getPassword
-    
-
+    sendOtp,
+    verifyOtp,
+    checkEmailId,
+    forgotPassword,
+    sendOtpIfEmailIdNotExists
 }
