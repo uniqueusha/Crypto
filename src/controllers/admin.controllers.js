@@ -1009,7 +1009,7 @@ const sendOtp = async (req, res) => {
   const updateQuery = `UPDATE contrasena SET extenstions = ? WHERE untitled_id = ?`;
   await connection.query(updateQuery, [hash, untitledData.untitled_id]);
       // Commit the transaction
-      await connection.query("COMMIT");
+      await connection.commit();
       return res.status(200).json({
         status: 200,
         message: "Password has been updated successfully"
