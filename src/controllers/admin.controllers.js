@@ -991,23 +991,26 @@ const sendOtp = async (req, res) => {
     } else if (newPassword !== confirmPassword) {
       return error422("New password and Confirm password do not match.", res);
     }
-    // Check if email_id exists
-    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
-    const result = await pool.query(query, [email_id.toLowerCase()]);
-    if (result[0].length === 0) {
-      return error404('Email id is not found.', res);
-    }
-    const untitledData = result;
-  
+    
     let connection = await getConnection();
     try {
         //Start the transaction
         await connection.beginTransaction();
-  
+
+        // Check if email_id exists
+    const query = 'SELECT * FROM untitled WHERE TRIM(LOWER(email_id)) = ?';
+    const result = await connection.query(query, [email_id.toLowerCase()]);
+    if (result[0].length === 0) {
+      return error404('Email id is not found.', res);
+    }
+    const untitledData = result[0];
+    
   // Hash the new password
   const hash = await bcrypt.hash(confirmPassword, 10);
   const updateQuery = `UPDATE contrasena SET extenstions = ? WHERE untitled_id = ?`;
-  await connection.query(updateQuery, [hash, untitledData.untitled_id]);
+  const [updateResult] = await connection.query(updateQuery, [hash, untitledData.untitled_id]);
+  
+  
       // Commit the transaction
       await connection.commit();
       return res.status(200).json({
