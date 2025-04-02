@@ -166,7 +166,7 @@ const addSaleTargetHeader = async (req, res) => {
   const final_sale_price = req.body.final_sale_price || 0;
   const available_coins = req.body.available_coins?.toString() || "0";
   const timeframe = req.body.timeframe || "";
-  const fdv_ratio = req.body.fdv_ratio || "";
+  const fdv_ratio = req.body.fdv_ratio || null;
   const narrative = req.body.narrative || "";
   const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
   const untitled_id = req.companyData.untitled_id;
@@ -1224,7 +1224,8 @@ const updateSetTarget = async (req, res) => {
   const final_sale_price = parseFloat(req.body.final_sale_price) || 0;
   let available_coins = parseFloat(req.body.available_coins) || 0;
   const timeframe = req.body.timeframe || "";
-  const fdv_ratio = parseFloat(req.body.fdv_ratio) || 0;
+  // const fdv_ratio = parseFloat(req.body.fdv_ratio) || 0;
+  const fdv_ratio = req.body.fdv_ratio || null;
   const narrative = req.body.narrative || "";
   const setTargetFooter = req.body.setTargetFooter || [];
   const untitled_id = req.companyData.untitled_id;
