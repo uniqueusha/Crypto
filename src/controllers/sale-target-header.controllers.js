@@ -168,12 +168,14 @@ const addSaleTargetHeader = async (req, res) => {
   const timeframe = req.body.timeframe || "";
   const fdv_ratio = req.body.fdv_ratio || "";
   const narrative = req.body.narrative || "";
-  const setTargetFooter = Array.isArray(req.body.setTargetFooter) ? req.body.setTargetFooter : [];
+  const setTargetFooter = Array.isArray(req.body.setTargetFooter)
+    ? req.body.setTargetFooter
+    : [];
   const untitled_id = req.companyData.untitled_id;
 
   if (!ticker) {
     return error422("Ticker is required.", res);
-  } 
+  }
 
   let connection = await getConnection();
 
@@ -197,8 +199,8 @@ const addSaleTargetHeader = async (req, res) => {
       market_cap,
       return_x,
       final_sale_price,
-      available_coins, 
-      available_coins, 
+      available_coins,
+      available_coins,
       timeframe,
       fdv_ratio,
       narrative,
@@ -225,8 +227,12 @@ const addSaleTargetHeader = async (req, res) => {
       }
 
       const sale_target_value = element.sale_target_value?.toString() || "0";
-      const sale_target_percent = element.sale_target_percent?.toString() || "0";
-      const targetValue = ((parseFloat(available_coins) / 100) * parseFloat(sale_target_value)).toString();
+      const sale_target_percent =
+        element.sale_target_percent?.toString() || "0";
+      const targetValue = (
+        (parseFloat(available_coins) / 100) *
+        parseFloat(sale_target_value)
+      ).toString();
 
       const insertSetTargetFooterQuery = `
         INSERT INTO set_target_footer (
@@ -241,7 +247,10 @@ const addSaleTargetHeader = async (req, res) => {
         sale_target_percent,
         untitled_id,
       ];
-      await connection.query(insertSetTargetFooterQuery, insertSetTargetFooterValues);
+      await connection.query(
+        insertSetTargetFooterQuery,
+        insertSetTargetFooterValues
+      );
     }
 
     await connection.commit();
@@ -257,8 +266,6 @@ const addSaleTargetHeader = async (req, res) => {
     await connection.release();
   }
 };
-
-
 
 //coin and exchange already exist
 // const addCoinExchange = async (req, res) => {
@@ -645,11 +652,6 @@ const getSetTargets = async (req, res) => {
       }
     }
     getSetTargetQuery += " ORDER BY CAST(market_cap AS DECIMAL(20,2)) DESC ";
-    let result = await connection.query(getSetTargetQuery);
-    let setTarget = result[0];
-
-    // Apply pagination if both page and perPage are provided
-    let total = 0;
     if (page && perPage) {
       const totalResult = await connection.query(countQuery);
       total = parseInt(totalResult[0][0].total);
@@ -657,6 +659,10 @@ const getSetTargets = async (req, res) => {
       const start = (page - 1) * perPage;
       getSetTargetQuery += ` LIMIT ${perPage} OFFSET ${start}`;
     }
+
+    // NOW execute the final query after appending pagination
+    let result = await connection.query(getSetTargetQuery);
+    let setTarget = result[0];
 
     // Get set_header_footer
     for (let i = 0; i < setTarget.length; i++) {
@@ -980,7 +986,9 @@ const getSetTargetDownload = async (req, res) => {
                   FROM set_target_footer stf
                   LEFT JOIN target_status ts ON ts.target_id = stf.target_id
                   LEFT JOIN complition_status cs ON cs.complition_id = stf.complition_id
-                  WHERE stf.untitled_id = ? AND stf.sale_target_id IN (${saleTargetIds.join(",")})
+                  WHERE stf.untitled_id = ? AND stf.sale_target_id IN (${saleTargetIds.join(
+                    ","
+                  )})
                   ORDER BY COALESCE(stf.sale_target_percent, 0) DESC, stf.sale_target_id ASC
               `;
 
@@ -1001,21 +1009,23 @@ const getSetTargetDownload = async (req, res) => {
     });
     const formatCoinValue = (value) => {
       if (value == null || isNaN(Number(value))) return "0";
-    
-      let formattedValue = (Math.floor(Number(value) * 10000) / 10000).toFixed(4);
-    
+
+      let formattedValue = (Math.floor(Number(value) * 10000) / 10000).toFixed(
+        4
+      );
+
       // Remove unnecessary trailing zeros, keeping up to 4 decimals where needed
       if (formattedValue.endsWith(".0000")) {
         return formattedValue.slice(0, -5);
       }
-    
+
       return formattedValue.replace(/(\.\d*?[1-9])0+$/, "$1");
     };
     let flattenedData = setTarget.map((target, index) => {
       let footers = footerMap[target.sale_target_id] || [];
       let rowData = {
         "Sr. No.": index + 1,
-        "Date": target.target_date,
+        Date: target.target_date,
         "Coin Name": target.coins,
         "Coin Ticker": target.ticker,
         Exchange: target.exchange,
@@ -1035,9 +1045,10 @@ const getSetTargetDownload = async (req, res) => {
 
       footers.reverse().forEach((footer, idx) => {
         rowData[`Sale Price ${idx + 1}`] = footer.sale_target;
-        rowData[`Sale Coin ${idx + 1}`] = parseFloat(footer.sale_target_coin) % 1 === 0 
-          ? parseInt(footer.sale_target_coin) 
-          : parseFloat(footer.sale_target_coin).toFixed(4);
+        rowData[`Sale Coin ${idx + 1}`] =
+          parseFloat(footer.sale_target_coin) % 1 === 0
+            ? parseInt(footer.sale_target_coin)
+            : parseFloat(footer.sale_target_coin).toFixed(4);
       });
 
       return rowData;
@@ -1230,10 +1241,12 @@ const updateSetTarget = async (req, res) => {
   const untitled_id = req.companyData.untitled_id;
 
   // if (!ticker) return error422("Ticker is required.", res);
-  
 
-  const saleTargetHeaderQuery = "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
-  const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [sale_target_id]);
+  const saleTargetHeaderQuery =
+    "SELECT * FROM sale_target_header WHERE sale_target_id = ?";
+  const [saleTargetHeaderResult] = await pool.query(saleTargetHeaderQuery, [
+    sale_target_id,
+  ]);
   if (saleTargetHeaderResult.length === 0) {
     return error422("Sale Target Header Not Found.", res);
   }
@@ -1317,7 +1330,10 @@ const updateSetTarget = async (req, res) => {
       FROM sale_target_header 
       WHERE sale_target_id = ? AND untitled_id = ?`;
 
-    const [totalAvailableCoinsResult] = await connection.query(getTotalAvailableCoinsQuery, [sale_target_id, untitled_id]);
+    const [totalAvailableCoinsResult] = await connection.query(
+      getTotalAvailableCoinsQuery,
+      [sale_target_id, untitled_id]
+    );
 
     let total_available_coins =
       totalAvailableCoinsResult.length > 0
@@ -1331,7 +1347,10 @@ const updateSetTarget = async (req, res) => {
       FROM set_target_footer 
       WHERE sale_target_id = ? AND untitled_id = ? AND complition_id = 4`;
 
-    const [saleTargetCoinResult] = await connection.query(getSaleTargetCoinQuery, [sale_target_id, untitled_id]);
+    const [saleTargetCoinResult] = await connection.query(
+      getSaleTargetCoinQuery,
+      [sale_target_id, untitled_id]
+    );
 
     const total_sale_target_coin =
       saleTargetCoinResult.length > 0
@@ -1365,7 +1384,6 @@ const updateSetTarget = async (req, res) => {
     }
   }
 };
-
 
 //set target by id
 const getSetTarget = async (req, res) => {
@@ -1888,20 +1906,22 @@ const getDashboardDownload = async (req, res) => {
         // Function to format numbers (convert to integer if decimal part is zero)
         const formatCoinValue = (value) => {
           if (value == null || isNaN(Number(value))) return "0";
-        
-          let formattedValue = (Math.floor(Number(value) * 10000) / 10000).toFixed(4);
-        
+
+          let formattedValue = (
+            Math.floor(Number(value) * 10000) / 10000
+          ).toFixed(4);
+
           // Remove unnecessary trailing zeros, keeping up to 4 decimals where needed
           if (formattedValue.endsWith(".0000")) {
             return formattedValue.slice(0, -5);
           }
-        
+
           return formattedValue.replace(/(\.\d*?[1-9])0+$/, "$1");
         };
 
         structuredData.push({
           "Sr. No": srNo++, // Add serial number
-          "Date": element.sale_date,
+          Date: element.sale_date,
           "Coin Name": element.coin,
           "Cion Ticker": element.ticker,
           Exchange: element.exchange,
@@ -1983,10 +2003,9 @@ const getDashboardDownload = async (req, res) => {
   }
 };
 
-
 //Get Set Target List all
 const getAllSetTargets = async (req, res) => {
-  const { page, perPage, key,untitled_id } = req.query;
+  const { page, perPage, key, untitled_id } = req.query;
 
   // Attempt to obtain a database connection
   let connection = await getConnection();
@@ -2018,7 +2037,7 @@ const getAllSetTargets = async (req, res) => {
     if (untitled_id) {
       getSetTargetQuery += ` AND s.untitled_id = ${untitled_id}`;
       countQuery += ` AND s.untitled_id = ${untitled_id}`;
-  }
+    }
 
     getSetTargetQuery += " ORDER BY CAST(s.market_cap AS DECIMAL(20,2)) DESC ";
     let result = await connection.query(getSetTargetQuery);
@@ -2117,7 +2136,6 @@ const getAllSetTargets = async (req, res) => {
 
     return res.status(200).json(data);
   } catch (error) {
-    
     return error500(error, res);
   } finally {
     if (connection) connection.release();
@@ -2171,7 +2189,7 @@ const getAllSoldCoin = async (req, res) => {
     if (untitled_id) {
       getSoldCoinQuery += ` AND sth.untitled_id = ${untitled_id}`;
       countQuery += ` AND sth.untitled_id = ${untitled_id}`;
-  }
+    }
 
     getSoldCoinQuery += " ORDER BY sc.created_at DESC";
 
@@ -2216,7 +2234,6 @@ const getAllSoldCoin = async (req, res) => {
   }
 };
 
-
 //set target reached list All
 const getAllSetTargetReached = async (req, res) => {
   const { page, perPage, key, untitled_id } = req.query;
@@ -2242,8 +2259,7 @@ const getAllSetTargetReached = async (req, res) => {
 
     if (untitled_id) {
       getSetTargetQuery += ` AND untitled_id = ${untitled_id}`;
-      
-  }
+    }
 
     getSetTargetQuery += " ORDER BY CAST(market_cap AS DECIMAL(20,2)) DESC ";
     let result = await connection.query(getSetTargetQuery);
@@ -2339,5 +2355,5 @@ module.exports = {
   checkCoinExchange,
   getAllSetTargets,
   getAllSoldCoin,
-  getAllSetTargetReached
+  getAllSetTargetReached,
 };
